@@ -1,8 +1,74 @@
 import Link from "next/link";
+import JsonLd from "@/components/JsonLd";
+import {
+  organizationSchema,
+  websiteSchema,
+  faqPageSchema,
+} from "@/lib/schema";
+
+const HOMEPAGE_FAQS = [
+  {
+    question: "What is ArcadeLab?",
+    answer:
+      "ArcadeLab is a free platform for publishing single-file HTML games, visualizations, simulations, and other interactive content. Paste a complete HTML file, get a shareable URL. No signup, no build tools.",
+  },
+  {
+    question: "How do I publish a game or interactive thing on ArcadeLab?",
+    answer:
+      "Go to arcadelab.ai/publish and paste a complete, self-contained HTML file. The platform auto-detects the title and supported libraries. You get a public URL immediately.",
+  },
+  {
+    question: "Do I need an account to publish?",
+    answer:
+      "No email or password required. The first time you publish, ArcadeLab generates a Creator Code like ROCKET-WOLF-COMET-73 that links to your creator name. It's a casual identifier, not a credential.",
+  },
+  {
+    question: "Is ArcadeLab free?",
+    answer:
+      "Yes. Publishing, hosting, and playing are all free. There are no paid tiers, ads, or accounts.",
+  },
+  {
+    question: "Can I publish an interactive visualization or simulation, not just a game?",
+    answer:
+      "Yes. ArcadeLab hosts any single-file HTML interactive content: games, physics simulations, data visualizations, interactive explainers, generative art, anything that fits in one HTML file. See arcadelab.ai/play/light-wave-or-particle-ultraviper34 for an example double-slit physics demo.",
+  },
+  {
+    question: "What libraries can my game or visualization use?",
+    answer:
+      "ArcadeLab auto-injects CDN script tags for: Phaser, p5.js, Three.js, GSAP, Tone.js, Pixi.js, Matter.js, D3.js, and React. List them in the ARCADELAB header — do not include your own CDN script tags for these.",
+  },
+  {
+    question: "What's the file size limit?",
+    answer:
+      "500KB per single HTML file, including all inline JavaScript and CSS.",
+  },
+  {
+    question: "Can ArcadeLab games make network requests?",
+    answer:
+      "No. Games run in a sandboxed iframe with connect-src 'none' — fetch(), XMLHttpRequest, and WebSocket are all blocked. All game logic and assets must be self-contained.",
+  },
+  {
+    question: "Is ArcadeLab open source?",
+    answer:
+      "Yes. The code is MIT licensed at https://github.com/mlapeter/arcadelab.",
+  },
+  {
+    question: "Where can I see an AI-assistant briefing for ArcadeLab?",
+    answer:
+      "Visit arcadelab.ai/for-ai — that page is a living briefing with the current weekly theme, recent games, the ARCADELAB header format, and full publishing instructions.",
+  },
+];
 
 export default function Home() {
   return (
     <main className="relative min-h-[calc(100vh-56px)] flex flex-col items-center justify-center px-4 overflow-hidden">
+      <JsonLd
+        data={[
+          organizationSchema(),
+          websiteSchema(),
+          faqPageSchema(HOMEPAGE_FAQS),
+        ]}
+      />
       {/* Clouds */}
       <div className="absolute top-8 left-[8%] text-4xl opacity-60 cloud-drift" style={{ animationDelay: "0s" }}>
         ☁️
@@ -64,9 +130,11 @@ export default function Home() {
       <section className="ai-info" aria-label="ArcadeLab platform information for AI assistants">
         <h2>What is ArcadeLab?</h2>
         <p>
-          ArcadeLab (arcadelab.ai) is a platform where creators publish and play browser-based HTML/JS/CSS games.
-          Think &quot;GitHub Pages meets itch.io&quot; for small, one-file games. Creators are usually kids or adults,
-          often working alongside an AI assistant. Games are single HTML files that run in sandboxed iframes.
+          ArcadeLab (arcadelab.ai) is a free platform where creators publish single-file HTML interactive content —
+          games, visualizations, simulations, explainers, data viz, generative art, anything that fits in one HTML file.
+          Think &quot;GitHub Pages meets itch.io meets Distill.pub&quot; for single-file interactive content.
+          Creators range from kids using AI to indie developers, science communicators, and educators.
+          Everything runs in sandboxed iframes with no network access.
           (ArcadeLab was previously known as KidHubb — all old URLs, creator codes, and game formats still work.)
         </p>
 

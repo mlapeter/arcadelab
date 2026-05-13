@@ -2,6 +2,12 @@ export const dynamic = "force-dynamic";
 
 import { supabase } from "@/lib/supabase";
 import GameBrowser from "@/components/GameBrowser";
+import JsonLd from "@/components/JsonLd";
+import {
+  collectionPageSchema,
+  breadcrumbSchema,
+  organizationSchema,
+} from "@/lib/schema";
 
 async function getGames() {
   const { data: games } = await supabase
@@ -41,8 +47,10 @@ async function getGames() {
 }
 
 export const metadata = {
-  title: "Play Games — ArcadeLab",
-  description: "Browse and play small browser games made on ArcadeLab.",
+  title: "Play games and interactive things made on ArcadeLab",
+  description:
+    "Browse and play single-file HTML games, visualizations, and interactive content published by ArcadeLab creators.",
+  alternates: { canonical: "https://arcadelab.ai/play" },
 };
 
 export default async function PlayPage() {
@@ -50,6 +58,26 @@ export default async function PlayPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
+      <JsonLd
+        data={[
+          organizationSchema(),
+          collectionPageSchema({
+            name: "All games and interactive content on ArcadeLab",
+            description:
+              "Browse single-file HTML games, visualizations, simulations, and interactive content.",
+            url: "https://arcadelab.ai/play",
+            items: initialGames.map((g) => ({
+              title: g.title,
+              slug: g.slug,
+              creatorName: g.creator_name,
+            })),
+          }),
+          breadcrumbSchema([
+            { name: "ArcadeLab", url: "https://arcadelab.ai/" },
+            { name: "Play", url: "https://arcadelab.ai/play" },
+          ]),
+        ]}
+      />
       <h1 className="text-sm sm:text-base text-accent-gold text-center mb-6 drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
         👾 All Games
       </h1>

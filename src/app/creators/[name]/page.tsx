@@ -2,6 +2,12 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import GameCard from "@/components/GameCard";
+import JsonLd from "@/components/JsonLd";
+import {
+  profilePageSchema,
+  breadcrumbSchema,
+  organizationSchema,
+} from "@/lib/schema";
 import type { Metadata } from "next";
 
 interface Props {
@@ -40,9 +46,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!data) return { title: "Creator Not Found — ArcadeLab" };
 
+  const url = `https://arcadelab.ai/creators/${encodeURIComponent(data.creator.display_name)}`;
+
   return {
-    title: `${data.creator.display_name} — ArcadeLab`,
-    description: `Games by ${data.creator.display_name} on ArcadeLab`,
+    title: `Games by ${data.creator.display_name} — ArcadeLab`,
+    description: `${data.creator.display_name} publishes single-file HTML games and interactive things on ArcadeLab.`,
+    alternates: { canonical: url },
+    openGraph: {
+      title: `Games by ${data.creator.display_name}`,
+      description: `${data.creator.display_name} on ArcadeLab — ${data.games.length} ${data.games.length === 1 ? "thing" : "things"} published.`,
+      url,
+      siteName: "ArcadeLab",
+      type: "profile",
+    },
   };
 }
 
@@ -54,8 +70,29 @@ export default async function CreatorPage({ params }: Props) {
 
   const { creator, games } = data;
 
+  const profileUrl = `https://arcadelab.ai/creators/${encodeURIComponent(creator.display_name)}`;
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
+      <JsonLd
+        data={[
+          organizationSchema(),
+          profilePageSchema({
+            creatorName: creator.display_name,
+            url: profileUrl,
+            games: games.map((g) => ({
+              title: g.title,
+              slug: g.slug,
+              creatorName: creator.display_name,
+            })),
+          }),
+          breadcrumbSchema([
+            { name: "ArcadeLab", url: "https://arcadelab.ai/" },
+            { name: "Creators", url: "https://arcadelab.ai/play" },
+            { name: creator.display_name, url: profileUrl },
+          ]),
+        ]}
+      />
       <div className="text-center mb-8">
         <h1 className="text-sm sm:text-base text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
           {creator.display_name}

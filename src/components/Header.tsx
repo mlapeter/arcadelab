@@ -17,6 +17,12 @@ export default function Header() {
         </Link>
         <nav className="flex items-center gap-2 sm:gap-3">
           <Link
+            href="/learn"
+            className="hidden md:block px-3 py-2 text-[10px] text-parchment/70 hover:text-accent-gold transition-colors"
+          >
+            Learn
+          </Link>
+          <Link
             href="/for-ai"
             className="hidden sm:block px-3 py-2 text-[10px] text-parchment/70 hover:text-accent-gold transition-colors"
           >

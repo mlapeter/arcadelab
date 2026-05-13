@@ -9,6 +9,8 @@ import CreatorBadge from "@/components/CreatorBadge";
 import StarButton from "@/components/StarButton";
 import RemixButton from "@/components/RemixButton";
 import GameOwnerActions from "@/components/GameOwnerActions";
+import JsonLd from "@/components/JsonLd";
+import { gameSchema, breadcrumbSchema } from "@/lib/schema";
 import type { Metadata } from "next";
 
 interface Props {
@@ -43,9 +45,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (!game) return { title: "Game Not Found — ArcadeLab" };
 
+  const url = `https://arcadelab.ai/play/${game.slug}`;
+  const ogImage = `https://arcadelab.ai/play/${game.slug}/opengraph-image`;
+  const description =
+    game.description || `Play ${game.title} by ${game.creator_name} on ArcadeLab — a single-file HTML game.`;
+
   return {
-    title: `${game.title} — ArcadeLab`,
-    description: game.description || `Play ${game.title} by ${game.creator_name} on ArcadeLab!`,
+    title: `${game.title} by ${game.creator_name} — ArcadeLab`,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: `${game.title} by ${game.creator_name}`,
+      description,
+      url,
+      siteName: "ArcadeLab",
+      images: [{ url: ogImage, width: 1200, height: 630 }],
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${game.title} by ${game.creator_name}`,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
@@ -99,8 +121,33 @@ export default async function PlayPage({ params }: Props) {
       .eq("status", "active"),
   ]);
 
+  const gameUrl = `https://arcadelab.ai/play/${game.slug}`;
+  const creatorUrl = `https://arcadelab.ai/creators/${encodeURIComponent(game.creator_name)}`;
+  const ogImage = `https://arcadelab.ai/play/${game.slug}/opengraph-image`;
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-4">
+      <JsonLd
+        data={[
+          gameSchema({
+            title: game.title,
+            description:
+              game.description || `${game.title} by ${game.creator_name} — a single-file HTML game on ArcadeLab.`,
+            url: gameUrl,
+            creatorName: game.creator_name,
+            creatorUrl,
+            datePublished: game.created_at,
+            playCount: game.play_count,
+            likeCount: game.like_count,
+            imageUrl: ogImage,
+          }),
+          breadcrumbSchema([
+            { name: "ArcadeLab", url: "https://arcadelab.ai/" },
+            { name: "Play", url: "https://arcadelab.ai/play" },
+            { name: game.title, url: gameUrl },
+          ]),
+        ]}
+      />
       {/* Remix provenance */}
       {game.forked_from && (
         <div className="mb-2 text-[10px] text-parchment/50">

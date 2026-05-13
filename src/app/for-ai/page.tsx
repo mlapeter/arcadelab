@@ -1,12 +1,73 @@
 import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
+import JsonLd from "@/components/JsonLd";
+import {
+  faqPageSchema,
+  breadcrumbSchema,
+  organizationSchema,
+} from "@/lib/schema";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "For AI Assistants — ArcadeLab",
-  description: "Instructions for AI assistants on how to format games for ArcadeLab",
+  title: "For AI Assistants — how to help creators publish on ArcadeLab",
+  description:
+    "Briefing for AI assistants helping creators format and publish single-file HTML games, visualizations, and interactive content on ArcadeLab.",
+  alternates: { canonical: "https://arcadelab.ai/for-ai" },
 };
+
+const FOR_AI_FAQS = [
+  {
+    question: "What is ArcadeLab?",
+    answer:
+      "ArcadeLab is a free platform for publishing single-file HTML interactive content — games, visualizations, simulations, explorables, generative art. Creators paste a complete HTML file at arcadelab.ai/publish and get a public URL.",
+  },
+  {
+    question: "What is the ARCADELAB header format?",
+    answer:
+      "A comment block at the very top of the HTML file (before <!DOCTYPE html>) containing: title, description, libraries (comma-separated), emoji, color, and optional remix_of slug. Example: <!--ARCADELAB title: My Game description: A short description libraries: phaser emoji: 🚀 color: blue -->",
+  },
+  {
+    question: "What libraries does ArcadeLab support?",
+    answer:
+      "Phaser, p5.js, Three.js, GSAP, Tone.js, Pixi.js, Matter.js, D3.js, and React. List them in the ARCADELAB header — ArcadeLab injects the CDN script tags automatically. Do NOT include your own script tags for these.",
+  },
+  {
+    question: "What are the rules for ArcadeLab content?",
+    answer:
+      "Single self-contained HTML file. All JavaScript and CSS inline. Maximum 500KB. Must work at any screen size. No network requests (fetch, XHR, WebSocket are blocked by the iframe sandbox).",
+  },
+  {
+    question: "Can ArcadeLab content access the network?",
+    answer:
+      "No. Games run in a sandboxed iframe with connect-src 'none'. fetch(), XMLHttpRequest, and WebSocket are all blocked. All logic and assets must be self-contained in the HTML file.",
+  },
+  {
+    question: "How do Creator Codes work?",
+    answer:
+      "ArcadeLab uses Creator Codes (e.g., ROCKET-WOLF-COMET-73) instead of email/password. A code is a casual identifier, not a credential. Creators get one automatically on first publish. To restore identity on a new device, use the 'Have a creator code?' link on /publish.",
+  },
+  {
+    question: "Can creators update or delete their content?",
+    answer:
+      "Yes. On a game's page, the creator (verified by Creator Code) sees Edit and Delete buttons. Editing replaces the HTML while keeping the same slug and URL. Deleting is permanent.",
+  },
+  {
+    question: "How does remixing work on ArcadeLab?",
+    answer:
+      "Every game has a Remix button that copies its source to the clipboard. Creators paste the source into a new chat with their AI assistant, modify it, and republish. The remix_of field in the ARCADELAB header preserves the link to the original.",
+  },
+  {
+    question: "How do I view a game's source code on ArcadeLab?",
+    answer:
+      "Every game's source is at arcadelab.ai/play/{slug}/source. The page shows the full HTML with syntax highlighting. AI assistants can fetch this URL directly to read the source.",
+  },
+  {
+    question: "What should I tell the creator after generating their code?",
+    answer:
+      "Tell them: 'Your game is ready! Copy all the code above, then go to arcadelab.ai/publish and paste it in.'",
+  },
+];
 
 async function getJamTheme() {
   const { data } = await supabase
@@ -74,6 +135,16 @@ export default async function ForAIPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
+      <JsonLd
+        data={[
+          organizationSchema(),
+          faqPageSchema(FOR_AI_FAQS),
+          breadcrumbSchema([
+            { name: "ArcadeLab", url: "https://arcadelab.ai/" },
+            { name: "For AI Assistants", url: "https://arcadelab.ai/for-ai" },
+          ]),
+        ]}
+      />
       {/* Dynamic content */}
       <div className="rpg-panel p-6 mb-8">
         <h1 className="text-xs sm:text-sm text-wood-dark mb-6">For AI Assistants: ArcadeLab Briefing</h1>
@@ -90,7 +161,7 @@ export default async function ForAIPage() {
         {/* Newest games */}
         {newestGames.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-[10px] text-wood-dark mb-3">Newest Games</h2>
+            <h2 className="text-[10px] text-wood-dark mb-3">What are the newest games on ArcadeLab?</h2>
             <ul className="text-[10px] leading-loose text-wood-mid space-y-2 list-inside normal-case">
               {newestGames.map((g) => (
                 <li key={g.slug}>
@@ -106,7 +177,7 @@ export default async function ForAIPage() {
         {/* Popular games */}
         {popularGames.length > 0 && (
           <div className="mb-6">
-            <h2 className="text-[10px] text-wood-dark mb-3">Popular Games</h2>
+            <h2 className="text-[10px] text-wood-dark mb-3">What are the most popular games on ArcadeLab?</h2>
             <ul className="text-[10px] leading-loose text-wood-mid space-y-2 list-inside normal-case">
               {popularGames.map((g) => (
                 <li key={g.slug}>
@@ -122,10 +193,12 @@ export default async function ForAIPage() {
 
         {/* What can creators build */}
         <div className="mb-6">
-          <h2 className="text-[10px] text-wood-dark mb-3">What Can Creators Build?</h2>
+          <h2 className="text-[10px] text-wood-dark mb-3">What can creators build on ArcadeLab?</h2>
           <p className="text-[10px] leading-relaxed text-wood-mid mb-2 normal-case">
-            Anything that runs in a browser! Platformers, puzzle games, art toys, interactive stories, space shooters,
-            music makers, drawing apps — if it&apos;s HTML/JS/CSS, it works on ArcadeLab.
+            Anything that runs in a browser as a single HTML file. Games — platformers, puzzlers, shooters,
+            tower defense, RPGs. Interactive visualizations — physics simulations, math toys, data viz, biology
+            models. Explainers — animated lessons, scrollytelling, Bret-Victor-style explorables. Generative
+            art and music toys. If it&apos;s HTML/JS/CSS, it works on ArcadeLab.
           </p>
           <p className="text-[10px] leading-relaxed text-wood-mid mb-2 normal-case">
             Creators can also browse existing games at arcadelab.ai/play, view source code at arcadelab.ai/play/SLUG/source,
@@ -148,7 +221,7 @@ export default async function ForAIPage() {
         <hr className="border-wood-mid/20 my-6" />
 
         {/* Static docs */}
-        <h2 className="text-[10px] text-wood-dark mb-3">ARCADELAB Header Format</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">What is the ARCADELAB header format?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-4 normal-case">
           When a creator asks you to make a game or wants to publish to ArcadeLab, output the final game as a single complete
           HTML file with this special comment at the very top:
@@ -174,7 +247,7 @@ remix_of: [original-game-slug, if this is a remix]
           Note: Games with the older <code className="text-accent-purple">&lt;!--KIDHUBB</code> header format are still fully supported.
         </p>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">Rules</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">What are the rules for ArcadeLab content?</h2>
         <ul className="text-[10px] leading-loose text-wood-mid space-y-1 mb-6 list-inside list-disc normal-case">
           <li>The game MUST be a single, self-contained HTML file</li>
           <li>All JavaScript and CSS should be inline</li>
@@ -190,7 +263,7 @@ remix_of: [original-game-slug, if this is a remix]
           <li>Pick an emoji and color that match your game&apos;s theme</li>
         </ul>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">No Network Access</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">Can ArcadeLab games access the network?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
           Games run in a sandboxed iframe with <code className="text-accent-purple">connect-src &apos;none&apos;</code>.
           This means <strong>fetch(), XMLHttpRequest, and WebSocket are all blocked</strong>. Do not build games that
@@ -198,7 +271,7 @@ remix_of: [original-game-slug, if this is a remix]
           HTML file.
         </p>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">Supported Libraries</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">What libraries does ArcadeLab support?</h2>
         <p className="text-[10px] text-wood-mid mb-2 normal-case">
           ArcadeLab loads these automatically via CDN when listed in the header. Do NOT include your own script tags for
           these — just list the name:
@@ -215,7 +288,7 @@ remix_of: [original-game-slug, if this is a remix]
           <li><strong className="text-accent-purple">react</strong> — UI components</li>
         </ul>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">Creator Codes &amp; Identity</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">How do Creator Codes work on ArcadeLab?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
           ArcadeLab uses Creator Codes instead of email/password — low friction, approachable for any age. A Creator Code looks like{" "}
           <strong className="text-accent-purple">WORD-WORD-WORD-00</strong> (e.g. ROCKET-WOLF-COMET-73,
@@ -226,14 +299,14 @@ remix_of: [original-game-slug, if this is a remix]
           device, use the &quot;Have a creator code?&quot; link on the publish page.
         </p>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">Game Update &amp; Delete</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">Can creators update or delete their games?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
           Creators can update or delete their published games. On the game page, the creator sees &quot;Edit&quot; and
           &quot;Delete&quot; options. Updating a game replaces the HTML content while keeping the same URL and slug.
           Deleting permanently removes the game.
         </p>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">Remixing Games</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">How does remixing work on ArcadeLab?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
           Creators can remix any game on ArcadeLab by clicking the &quot;Remix&quot; button on a game page,
           which copies the source code to their clipboard. If a creator brings you code they want
@@ -243,7 +316,7 @@ remix_of: [original-game-slug, if this is a remix]
           ArcadeLab automatically links the remix to the original.
         </p>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">Viewing Game Source Code</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">How can I view a game&apos;s source code on ArcadeLab?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
           Every game&apos;s source code is viewable at arcadelab.ai/play/SLUG/source.
           This page shows the full HTML with syntax highlighting. Creators can copy
@@ -251,7 +324,7 @@ remix_of: [original-game-slug, if this is a remix]
           fetch this page to read a game&apos;s source code directly.
         </p>
 
-        <h2 className="text-[10px] text-wood-dark mb-3">After Outputting the Code</h2>
+        <h2 className="text-[10px] text-wood-dark mb-3">What should I tell the creator after generating the code?</h2>
         <p className="text-[10px] text-wood-mid normal-case">
           Tell the creator: &quot;Your game is ready! Copy all the code above, then go to arcadelab.ai/publish and paste
           it in.&quot;

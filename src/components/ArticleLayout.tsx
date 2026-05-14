@@ -15,6 +15,7 @@ interface Props {
 
 export default function ArticleLayout({ article, children, faqs, howTo }: Props) {
   const url = `https://arcadelab.ai/learn/${article.slug}`;
+  const imageUrl = `https://arcadelab.ai/learn/${article.slug}/opengraph-image`;
   const related = getRelatedArticles(article.slug, 3);
 
   const schemas: object[] = [
@@ -24,6 +25,7 @@ export default function ArticleLayout({ article, children, faqs, howTo }: Props)
       description: article.description,
       url,
       datePublished: article.publishedDate,
+      imageUrl,
     }),
     breadcrumbSchema([
       { name: "ArcadeLab", url: "https://arcadelab.ai/" },

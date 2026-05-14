@@ -590,9 +590,15 @@ Total combined exposure: ~20k stars. P2.1 GitHub repo metadata already done in e
 - Various 0-star AEO lists — no audience/leverage
 
 **Phase 2 — paused on human action:**
-- **P2.3b AlternativeTo**: Hit hCaptcha + email field after Google sign-up was rejected. Needs user to complete signup (GitHub OAuth was authorized; AlternativeTo wants email + captcha for full account creation).
+- **P2.3b AlternativeTo**: Account created (username `arcadelab`, GitHub OAuth via mlapeter, email mike@resonantventures.com). **Hard-blocked on 7-day account-age anti-spam wall** — earliest submission allowed **May 21, 2026 at 9:11 PM Stockholm time (≈ May 21 12:11 PM PT)**. Submission flow already mapped; takes ~5 min when unblocked. Submission form pre-filled values in spec §11. Cannot auto-schedule because submission requires an authenticated browser session — user must ping the agent on or after May 21 to execute.
 - **P2.2 Wikidata**: Form is open and anonymous editing is allowed, but notability is borderline. Deferred until awesome-* PRs merge → those become "publicly available references" that strengthen the case. Revisit ~2 weeks.
-- **P2.4 dev.to / Hashnode cross-posts**: Needs decision on account + which articles to cross-post first.
+- **P2.4 dev.to cross-posts (pilot)**: ✅ 3 articles published under @arcadelab brand account (GitHub OAuth via mlapeter, brand profile rather than personal):
+  1. [How do I share an interactive thing I made with Claude or AI?](https://dev.to/arcadelab/how-do-i-share-an-interactive-thing-i-made-with-claude-or-ai-5c5p) — tags: ai, beginners, webdev, html
+  2. [Where can I publish an interactive visualization online?](https://dev.to/arcadelab/where-can-i-publish-an-interactive-visualization-online-4pep) — tags: webdev, javascript, datavisualization, showdev
+  3. [ArcadeLab vs itch.io vs Glitch vs GitHub Pages — which to use?](https://dev.to/arcadelab/arcadelab-vs-itchio-vs-glitch-vs-github-pages-which-to-use-2eg2) — tags: webdev, gamedev, opensource, showdev
+  - All set canonical_url back to arcadelab.ai (SEO credit stays on canonical site)
+  - Decision: if pilot performs well in 48-72h (views, reactions, comments), cross-post remaining 7 articles
+- **P2.4 Hashnode**: Not yet attempted. Smaller audience than dev.to; deferred until pilot results known.
 - **P2.5 narrative HN piece**: Still gated on D4.
 
 ### 2026-05-13 — Deploy + dashboard setup completed via Playwright browser session

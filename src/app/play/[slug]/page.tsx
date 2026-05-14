@@ -218,14 +218,7 @@ export default async function PlayPage({ params }: Props) {
         <CreatorBadge name={game.creator_name} />
       </div>
 
-      {/* Curated long description (only present for showcase games) */}
-      {override?.longDescription && (
-        <p className="mb-3 text-[11px] text-parchment/80 leading-relaxed normal-case">
-          {override.longDescription}
-        </p>
-      )}
-
-      {/* Game iframe */}
+      {/* Game iframe — front and center, the reason users came here */}
       <GamePlayer slug={game.slug} title={game.title} />
 
       {/* Stats bar */}
@@ -260,6 +253,17 @@ export default async function PlayPage({ params }: Props) {
         <div className="mt-2 text-[10px] text-parchment/50">
           🔀 {remixCount} {remixCount === 1 ? "remix" : "remixes"}
         </div>
+      )}
+
+      {/* Curated long description — shown below the game for showcase pages.
+          Below the iframe so the game is the first thing users see, but still
+          on-page for AI crawlers and SEO snippet extraction. */}
+      {override?.longDescription && (
+        <section className="mt-6 rpg-panel p-5">
+          <p className="text-[11px] text-wood-mid leading-relaxed normal-case">
+            {override.longDescription}
+          </p>
+        </section>
       )}
 
       {/* Curated FAQ (only present for showcase games) */}

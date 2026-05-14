@@ -10,7 +10,10 @@ import StarButton from "@/components/StarButton";
 import RemixButton from "@/components/RemixButton";
 import GameOwnerActions from "@/components/GameOwnerActions";
 import JsonLd from "@/components/JsonLd";
-import { gameSchema, breadcrumbSchema } from "@/lib/schema";
+import { gameSchema, breadcrumbSchema, learningResourceSchema, faqPageSchema } from "@/lib/schema";
+import { getGameOverride } from "@/lib/seo/game-overrides";
+import { getArticle } from "@/lib/articles";
+import { getPrompt } from "@/lib/seo/prompts";
 import type { Metadata } from "next";
 
 interface Props {
@@ -47,12 +50,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const url = `https://arcadelab.ai/play/${game.slug}`;
   const ogImage = `https://arcadelab.ai/play/${game.slug}/opengraph-image`;
-  const description =
-    game.description || `Play ${game.title} by ${game.creator_name} on ArcadeLab — a single-file HTML game.`;
+  const override = getGameOverride(game.slug);
+  // Prefer the curated long description for showcase games, fall back to the
+  // creator's own description, then to a generic fallback. Truncate to ~200 chars for meta.
+  const longDesc = override?.longDescription || game.description;
+  const description = longDesc
+    ? longDesc.length > 200 ? longDesc.substring(0, 197) + "..." : longDesc
+    : `Play ${game.title} by ${game.creator_name} on ArcadeLab — a single-file HTML game.`;
 
   return {
     title: `${game.title} by ${game.creator_name}`,
     description,
+    keywords: override?.educationalTopics,
     alternates: { canonical: url },
     openGraph: {
       title: `${game.title} by ${game.creator_name}`,
@@ -124,30 +133,66 @@ export default async function PlayPage({ params }: Props) {
   const gameUrl = `https://arcadelab.ai/play/${game.slug}`;
   const creatorUrl = `https://arcadelab.ai/creators/${encodeURIComponent(game.creator_name)}`;
   const ogImage = `https://arcadelab.ai/play/${game.slug}/opengraph-image`;
+  const override = getGameOverride(game.slug);
+  const primaryLibrary =
+    override?.primaryLibrary || (game.libraries && game.libraries[0]);
+
+  // Build schemas — always include Game + Breadcrumb. For showcase games with
+  // overrides, also include LearningResource (so AI engines see this as an
+  // interactive demo of a specific topic) and FAQPage (so the topical Q&A
+  // surfaces in search and citation contexts).
+  const schemas: object[] = [
+    gameSchema({
+      title: game.title,
+      description:
+        override?.longDescription ||
+        game.description ||
+        `${game.title} by ${game.creator_name} — a single-file HTML game on ArcadeLab.`,
+      url: gameUrl,
+      creatorName: game.creator_name,
+      creatorUrl,
+      datePublished: game.created_at,
+      playCount: game.play_count,
+      likeCount: game.like_count,
+      imageUrl: ogImage,
+    }),
+    breadcrumbSchema([
+      { name: "ArcadeLab", url: "https://arcadelab.ai/" },
+      { name: "Play", url: "https://arcadelab.ai/play" },
+      { name: game.title, url: gameUrl },
+    ]),
+  ];
+  if (override?.learningResourceType && override.educationalTopics) {
+    schemas.push(
+      learningResourceSchema({
+        name: game.title,
+        description: override.longDescription || game.description || game.title,
+        url: gameUrl,
+        learningResourceType: override.learningResourceType,
+        teaches: override.educationalTopics,
+        educationalLevel: override.educationalLevel,
+        creatorName: game.creator_name,
+        creatorUrl,
+        imageUrl: ogImage,
+        datePublished: game.created_at,
+      })
+    );
+  }
+  if (override?.faqs && override.faqs.length > 0) {
+    schemas.push(faqPageSchema(override.faqs));
+  }
+
+  // Resolve related article + prompt cross-links for the "Explore more" section.
+  const relatedArticles = (override?.relatedArticleSlugs || [])
+    .map((slug) => getArticle(slug))
+    .filter((a): a is NonNullable<typeof a> => Boolean(a));
+  const relatedPrompts = (override?.relatedPromptSlugs || [])
+    .map((slug) => getPrompt(slug))
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-4">
-      <JsonLd
-        data={[
-          gameSchema({
-            title: game.title,
-            description:
-              game.description || `${game.title} by ${game.creator_name} — a single-file HTML game on ArcadeLab.`,
-            url: gameUrl,
-            creatorName: game.creator_name,
-            creatorUrl,
-            datePublished: game.created_at,
-            playCount: game.play_count,
-            likeCount: game.like_count,
-            imageUrl: ogImage,
-          }),
-          breadcrumbSchema([
-            { name: "ArcadeLab", url: "https://arcadelab.ai/" },
-            { name: "Play", url: "https://arcadelab.ai/play" },
-            { name: game.title, url: gameUrl },
-          ]),
-        ]}
-      />
+      <JsonLd data={schemas} />
       {/* Remix provenance */}
       {game.forked_from && (
         <div className="mb-2 text-[10px] text-parchment/50">
@@ -172,6 +217,13 @@ export default async function PlayPage({ params }: Props) {
         </h1>
         <CreatorBadge name={game.creator_name} />
       </div>
+
+      {/* Curated long description (only present for showcase games) */}
+      {override?.longDescription && (
+        <p className="mb-3 text-[11px] text-parchment/80 leading-relaxed normal-case">
+          {override.longDescription}
+        </p>
+      )}
 
       {/* Game iframe */}
       <GamePlayer slug={game.slug} title={game.title} />
@@ -208,6 +260,73 @@ export default async function PlayPage({ params }: Props) {
         <div className="mt-2 text-[10px] text-parchment/50">
           🔀 {remixCount} {remixCount === 1 ? "remix" : "remixes"}
         </div>
+      )}
+
+      {/* Curated FAQ (only present for showcase games) */}
+      {override?.faqs && override.faqs.length > 0 && (
+        <section className="mt-8 rpg-panel p-5">
+          <h2 className="text-[11px] text-wood-dark mb-3">Frequently asked</h2>
+          <div className="space-y-3">
+            {override.faqs.map((faq, i) => (
+              <div key={i}>
+                <h3 className="text-[10px] text-wood-dark mb-1 normal-case font-semibold">
+                  {faq.question}
+                </h3>
+                <p className="text-[10px] text-wood-mid leading-relaxed normal-case">
+                  {faq.answer}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Explore more — related articles, prompts, library page */}
+      {(relatedArticles.length > 0 || relatedPrompts.length > 0 || primaryLibrary) && (
+        <section className="mt-6 rpg-panel p-5">
+          <h2 className="text-[11px] text-wood-dark mb-3">Explore more</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {relatedArticles.length > 0 && (
+              <div>
+                <h3 className="text-[10px] text-wood-dark mb-2 normal-case font-semibold">Guides</h3>
+                <ul className="space-y-1">
+                  {relatedArticles.map((a) => (
+                    <li key={a.slug} className="text-[10px] normal-case leading-relaxed">
+                      <Link href={`/learn/${a.slug}`} className="text-accent-purple hover:text-accent-gold transition-colors">
+                        <span className="mr-1">{a.emoji}</span>{a.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {relatedPrompts.length > 0 && (
+              <div>
+                <h3 className="text-[10px] text-wood-dark mb-2 normal-case font-semibold">Prompts</h3>
+                <ul className="space-y-1">
+                  {relatedPrompts.map((p) => (
+                    <li key={p.slug} className="text-[10px] normal-case leading-relaxed">
+                      <Link href={`/prompts/${p.slug}`} className="text-accent-purple hover:text-accent-gold transition-colors">
+                        <span className="mr-1">{p.emoji}</span>{p.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {primaryLibrary && LIBRARY_MAP[primaryLibrary] && (
+              <div>
+                <h3 className="text-[10px] text-wood-dark mb-2 normal-case font-semibold">Built with</h3>
+                <Link
+                  href={`/${primaryLibrary}`}
+                  className="text-[10px] text-accent-purple hover:text-accent-gold transition-colors normal-case"
+                >
+                  More {LIBRARY_MAP[primaryLibrary].label} on ArcadeLab →
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
       )}
     </main>
   );

@@ -233,6 +233,44 @@ export function gameSchema(input: {
   };
 }
 
+export function learningResourceSchema(input: {
+  name: string;
+  description: string;
+  url: string;
+  learningResourceType: string;
+  teaches: string[];
+  educationalLevel?: string;
+  creatorName?: string;
+  creatorUrl?: string;
+  imageUrl?: string;
+  datePublished?: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "LearningResource",
+    name: input.name,
+    description: input.description,
+    url: input.url,
+    learningResourceType: input.learningResourceType,
+    teaches: input.teaches,
+    inLanguage: "en",
+    isAccessibleForFree: true,
+    ...(input.educationalLevel ? { educationalLevel: input.educationalLevel } : {}),
+    ...(input.creatorName
+      ? {
+          creator: {
+            "@type": "Person",
+            name: input.creatorName,
+            ...(input.creatorUrl ? { url: input.creatorUrl } : {}),
+          },
+        }
+      : {}),
+    publisher: { "@id": ORG_ID },
+    ...(input.imageUrl ? { image: input.imageUrl } : {}),
+    ...(input.datePublished ? { datePublished: input.datePublished } : {}),
+  };
+}
+
 export interface GameListItem {
   title: string;
   slug: string;

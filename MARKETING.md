@@ -554,3 +554,68 @@ The agent should append to this section after each work session.
 - Phase 4 weekly GSC loop — needs ~2-3 weeks of GSC data before there's anything to optimize against
 - Phase 5 prompt-test scoreboard — can start immediately, but more useful once articles are indexed (1-2 weeks post-deploy)
 - Phase 6 external seeding — needs human gate per spec §11 (HN, Reddit, outreach emails)
+
+### 2026-05-14 — Day-1 audit + Phase 2 first moves
+
+**Audit findings (24h after launch):**
+- ✅ All routes live and rendering: /, /about, /for-ai, /publish, /play, /play/[slug], /learn, /learn/[slug], /creators/[name]
+- ✅ Rich Results Test: 2 valid items on homepage (FAQ + Org), 4 on articles (Article + Breadcrumbs + FAQ + Org)
+- ✅ JSON-LD inventory: 6 schemas on /, 6 on /about, 8 on each article, 3 on game pages
+- ✅ AI-crawler view: ClaudeBot fetch returns title + 10-entry FAQ + full nav text. /for-ai = 41KB of crawler-readable briefing.
+- ✅ **Vercel Analytics: chatgpt.com referring traffic within 24h of deploy (2 visitors).** 13 visitors / 144 pageviews in last 7d.
+- ✅ GSC: sitemap status Success, 158 pages discovered in <24h
+- ✅ Bing: sitemap status Success, 158 URLs discovered in <24h
+- Top organic-traffic pages so far: /publish (7), / (5), /learn/share-interactive-thing-made-with-ai (3), /play (3), /about (2), /learn (2)
+- Geographic mix: 38% US, 31% China, 8% Bolivia, 8% NZ, 8% Peru. 69% mobile / 31% desktop. Android 62%.
+
+**Bugs fixed:**
+- Page titles were doubling "— ArcadeLab — ArcadeLab" on game/source/creator pages (layout template + hard-coded suffix). Fixed in `fc71b93`.
+- Rich Results flagged "missing image" non-critical on Article schema. Added dynamic OG image for /learn/[slug] in `5758c57`. Each guide now has 1200x630 card with emoji + title + tagline + brand.
+
+**Phase 2 first moves:**
+- **P2.1 GitHub repo metadata** — done in previous session (description, 20 topics, homepage URL)
+- **P2.3 awesome-* list PR #1 shipped:** Added ArcadeLab to `filipecalegario/awesome-vibe-coding` (4,379 stars) under Communities & Job Boards. PR: https://github.com/filipecalegario/awesome-vibe-coding/pull/182
+- **P2.3 deferred candidates** (waiting for more traction before submitting): `terkelg/awesome-creative-coding` (14.8k stars, has "wait a couple weeks" guideline), `dawdle-deer/awesome-learn-gamedev` (3.4k), `MooseTheRebel/awesome-static-hosting-and-cms` (313), `ai-for-developers/awesome-vibe-coding` (708)
+
+**Still pending in Phase 2:**
+- P2.2 Wikidata entry
+- P2.3b AlternativeTo listing
+- P2.4 dev.to / Hashnode cross-posts (needs human input — which account, when)
+- P2.5 narrative HN piece (gated on D4)
+
+### 2026-05-13 — Deploy + dashboard setup completed via Playwright browser session
+
+User logged into Vercel, then I drove the remaining dashboard work end-to-end.
+
+**Deployed** (3 commits on `main`, pushed at ~17:23 UTC, Vercel auto-deploy completed within a minute):
+- `3b403dc` Add AEO foundation: schemas, sitemap, robots, llms.txt, /about, OG cards (18 files, +1236 / -35)
+- `9122c18` Add /learn route with 10 launch guides (16 files, +1991)
+- `4d0c7bd` Add MARKETING.md spec and Phase 0 handoff doc (2 files, +690)
+
+**Verified live:**
+- `https://arcadelab.ai/robots.txt` — serves AI-crawler-friendly directives
+- `https://arcadelab.ai/llms.txt` — serves full LLM briefing
+- `https://arcadelab.ai/sitemap.xml` — generates dynamically (XML valid)
+- `https://arcadelab.ai/04f4a892a97411b949cedc59bfc3b4d0.txt` — IndexNow key file live
+- `https://arcadelab.ai/about` — entity anchor page live
+- `https://arcadelab.ai/learn/*` — all 10 guide pages return 200, prerendered static
+- JSON-LD validated: 6 schemas on `/`, 8 on `/about`, 10 on a sample `/learn/*` article
+- OG image generation working at `/play/[slug]/opengraph-image`
+
+**Vercel Analytics:** enabled in dashboard for the `kidhubb` project (Pro plan free tier "Web Analytics — Included in your plan"). Data starts on next page view.
+
+**IndexNow:** all 16 launch URLs (homepage, /about, /for-ai, /publish, /play, /learn, and 10 articles) submitted to `api.indexnow.org/indexnow` — HTTP 202 accepted.
+
+**Google Search Console:**
+- Property added as Domain (`arcadelab.ai`) under mike@resonantventures.com
+- DNS TXT verification record added via Vercel DNS (`google-site-verification=IoIkoqR2uH0WxC6_g8xBQ4L2X43PLYrKB7xA1ryp3E4`) — propagation confirmed at both `ns1.vercel-dns.com` and `8.8.8.8` within seconds
+- "Ownership verified" confirmed by GSC
+- Sitemap submitted: `https://arcadelab.ai/sitemap.xml` — "Sitemap submitted successfully"
+
+**Bing Webmaster Tools:**
+- Account created with same Google identity (mike@resonantventures.com) via OAuth
+- Imported `arcadelab.ai` from GSC (one-click; un-selected an unrelated `the100.io` GSC property that surfaced from the same Google account)
+- Bing notes data may take ~48 hours to populate
+- Sitemap submitted directly: `https://arcadelab.ai/sitemap.xml` — Status: Processing
+
+**Phase 0 is fully complete.** Next session can pick up Phase 2 (Wikidata, AlternativeTo, dev.to cross-posts) or start Phase 5 (prompt-test scoreboard) immediately.

@@ -435,6 +435,14 @@ Optional. Default is no. If the founder wants a presence, the rule is: share gam
 
 ---
 
+## 9.5 Pending follow-ups
+
+Dated reminders and cross-session action items live in a **private working doc** outside the public repo (since the repo is open source):
+
+📋 **`MARKETING_PRIVATE/FOLLOWUPS.md`** — gitignored, local-only.
+
+When starting a new session, read that file first to see what's pending.
+
 ## 10. Decision points needed from human
 
 | ID | Decision | Resolution |

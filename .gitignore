@@ -36,6 +36,10 @@ yarn-error.log*
 # playwright mcp
 .playwright-mcp/
 
+# private marketing working docs (not for public repo)
+MARKETING_PRIVATE/
+MARKETING.backup-*.md
+
 # vercel
 .vercel
 

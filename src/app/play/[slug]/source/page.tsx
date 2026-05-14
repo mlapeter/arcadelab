@@ -36,10 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const game = await getGameWithSource(slug);
 
-  if (!game) return { title: "Source Not Found — ArcadeLab" };
+  if (!game) return { title: "Source Not Found" };
 
   return {
-    title: `Source: ${game.title} — ArcadeLab`,
+    title: `Source: ${game.title}`,
     description: `View the source code of ${game.title} by ${game.creator_name}`,
   };
 }

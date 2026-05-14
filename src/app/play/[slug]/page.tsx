@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const game = await getGame(slug);
 
-  if (!game) return { title: "Game Not Found — ArcadeLab" };
+  if (!game) return { title: "Game Not Found" };
 
   const url = `https://arcadelab.ai/play/${game.slug}`;
   const ogImage = `https://arcadelab.ai/play/${game.slug}/opengraph-image`;
@@ -51,7 +51,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     game.description || `Play ${game.title} by ${game.creator_name} on ArcadeLab — a single-file HTML game.`;
 
   return {
-    title: `${game.title} by ${game.creator_name} — ArcadeLab`,
+    title: `${game.title} by ${game.creator_name}`,
     description,
     alternates: { canonical: url },
     openGraph: {

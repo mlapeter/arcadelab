@@ -44,12 +44,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await params;
   const data = await getCreatorAndGames(name);
 
-  if (!data) return { title: "Creator Not Found — ArcadeLab" };
+  if (!data) return { title: "Creator Not Found" };
 
   const url = `https://arcadelab.ai/creators/${encodeURIComponent(data.creator.display_name)}`;
 
   return {
-    title: `Games by ${data.creator.display_name} — ArcadeLab`,
+    title: `Games by ${data.creator.display_name}`,
     description: `${data.creator.display_name} publishes single-file HTML games and interactive things on ArcadeLab.`,
     alternates: { canonical: url },
     openGraph: {

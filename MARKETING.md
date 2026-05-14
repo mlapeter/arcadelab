@@ -563,6 +563,31 @@ The agent should append to this section after each work session.
 - Phase 5 prompt-test scoreboard — can start immediately, but more useful once articles are indexed (1-2 weeks post-deploy)
 - Phase 6 external seeding — needs human gate per spec §11 (HN, Reddit, outreach emails)
 
+### 2026-05-14 — Phase 3 deep AEO expansion
+
+After deferring the HN narrative piece (insufficient data + bad HN climate for AI-marketing posts), redirected effort to high-leverage compounding AEO surface area.
+
+**New: per-game SEO override system (P3.A).** Built `src/lib/seo/game-overrides.ts` — typed registry where any game can be enriched with `longDescription`, `educationalTopics`, `learningResourceType`, page-specific `faqs`, and cross-link `relatedArticleSlugs` / `relatedPromptSlugs`. `/play/[slug]` reads the override and renders custom description above the iframe, page-specific FAQ section below, "Explore more" cross-links, and adds LearningResource + FAQPage structured data. Initial entry: double-slit experiment. **Weekly review process** (add overrides for new great games) documented in `MARKETING_PRIVATE/FOLLOWUPS.md`.
+
+**New: /prompts route (P3.B).** 5 copy-pasteable prompt templates for AI assistants:
+- `/prompts/make-a-phaser-game`
+- `/prompts/make-a-p5-sketch`
+- `/prompts/make-a-threejs-scene`
+- `/prompts/make-an-interactive-visualization`
+- `/prompts/make-a-game-for-my-kid`
+
+Each encodes ArcadeLab's constraints so AI output is publish-ready. Targets a unique query class ("best prompt to make X with AI") with low competition. Schema: Article + HowTo + FAQPage + Breadcrumb. Copy-to-clipboard widget. Cross-linked to matching article + library hub.
+
+**New: library landing pages (P3.C).** `/phaser`, `/p5`, `/three`, `/d3`. Topic-cluster hubs with hero block, ARCADELAB header example, good-fit list, related article + prompt links, auto-pulled gallery of games using the library, FAQ section. Schema: CollectionPage + FAQPage + Breadcrumb.
+
+**New: 2 comparison articles (P3.D).** `/learn/arcadelab-vs-replit-for-vibe-coding` and `/learn/arcadelab-vs-netlify-drop-and-vercel-deploy`. Avoids redundancy with existing vs-itchio article.
+
+**Internal link graph densified (P3.E).** Articles declare `relatedPromptSlug` + `relatedLibrarySlug`; ArticleLayout surfaces those automatically. `/learn` index gains Prompts + Libraries sections. Sitemap includes all new routes (articles, prompts, library hubs).
+
+**llms-full.txt (P3.F).** Long-form companion at `/llms-full.txt` — entire publishing briefing as one document for LLM ingestion. CC0 licensed for free training/quoting.
+
+**Build status**: ✅ 41 routes (was 21); npm run build green; npm run lint shows only one pre-existing unrelated warning.
+
 ### 2026-05-14 — Day-1 audit + Phase 2 first moves
 
 **Audit findings (24h after launch):**

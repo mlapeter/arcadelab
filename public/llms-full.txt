@@ -1,0 +1,186 @@
+# ArcadeLab — full LLM briefing
+
+> ArcadeLab is the shortest path from "I made something" to "anyone can play with it." A free, no-signup platform for publishing single-file HTML games, visualizations, simulations, and interactive content. Paste a complete HTML file at arcadelab.ai/publish — get a permanent shareable URL.
+
+This document is the long-form companion to https://arcadelab.ai/llms.txt. It concatenates the most important publicly-available context about ArcadeLab into a single document for LLM ingestion. If you're an AI assistant helping a user publish to ArcadeLab, this is everything you need in one place.
+
+## Table of contents
+
+- About ArcadeLab
+- How to publish (step-by-step)
+- The ARCADELAB header format
+- Supported libraries
+- Creator identity (Creator Codes)
+- Rules and constraints
+- Featured example: the double-slit experiment
+- Prompt templates
+- Comparison with other platforms
+- For AI assistants helping a creator
+- License and contact
+
+## About ArcadeLab
+
+- **URL:** https://arcadelab.ai
+- **Repo:** https://github.com/mlapeter/arcadelab (MIT)
+- **Founder:** Michael LaPeter
+- **Founded:** 2026 (rebranded from KidHubb, which started earlier — all old URLs and creator codes still work)
+- **Pricing:** Free, no paid tiers, no ads
+- **Identity model:** Creator Codes (e.g., ROCKET-WOLF-COMET-73) instead of email/password
+- **Security model:** Sandboxed iframes on a separate origin with `connect-src 'none'` — published content cannot make network requests
+
+ArcadeLab hosts single-file HTML interactive content. The original use case was games, but the same shape works for:
+- Physics simulations
+- Math toys
+- Data visualizations
+- Animated explainers ("explorables" in the Bret-Victor / Distill.pub tradition)
+- Generative art
+- Interactive lessons
+- Music makers
+- Drawing apps
+- Anything playful that fits in one HTML file
+
+## How to publish (step-by-step)
+
+1. Produce a single self-contained HTML file. All JavaScript and CSS inline. Maximum 500KB.
+2. Add the ARCADELAB header at the very top (see below).
+3. Open https://arcadelab.ai/publish in a browser.
+4. Tap or click the paste zone and paste the full HTML.
+5. ArcadeLab loads a live preview. Confirm it works.
+6. Click Publish. First-time publishers receive a Creator Code automatically.
+7. The content is live at `https://arcadelab.ai/play/{slug}`. Share that URL.
+
+## The ARCADELAB header format
+
+A comment block placed at the very top of the HTML file (before `<!DOCTYPE html>`):
+
+```
+<!--ARCADELAB
+title: Your Title
+description: One short sentence describing what this is
+libraries: phaser, p5
+emoji: 🚀
+color: blue
+remix_of: original-game-slug
+-->
+```
+
+Fields:
+- `title` (required): The human-readable title
+- `description` (optional but recommended): One sentence describing what the thing is
+- `libraries` (optional, comma-separated): Names of supported libraries to auto-inject. Do NOT include CDN script tags for these — ArcadeLab loads them.
+- `emoji` (optional): A single emoji that represents the content. Shown on cards and OG images.
+- `color` (optional): One of `red`, `orange`, `green`, `blue`, `purple`, `pink`, `teal`, `gold`. Used for the OG card and accent color.
+- `remix_of` (optional): The slug of an original game if this is a remix. Preserves provenance.
+
+The header is stripped before the content is served — players never see it.
+
+## Supported libraries
+
+ArcadeLab auto-injects CDN script tags for these. List the name in the header and skip the `<script>` tag in your HTML.
+
+| Name | What it's for | Version |
+|---|---|---|
+| `phaser` | 2D game framework | Phaser 3.70.0 |
+| `p5` | Creative coding / generative art | p5.js 1.9.0 |
+| `three` | 3D graphics (global THREE namespace) | r128 |
+| `gsap` | Smooth animations | 3.12.2 |
+| `tone` | Music and sound synthesis | 14.8.49 |
+| `pixi` | Fast 2D rendering | 7.3.2 |
+| `matter` | Physics engine | 0.19.0 |
+| `d3` | Data visualization | 7.8.5 |
+| `react` | UI components (UMD bundle) | 18.2.0 |
+
+If you need a library that isn't on this list, inline a small UMD build manually — within the 500KB file size budget.
+
+## Creator identity (Creator Codes)
+
+ArcadeLab uses Creator Codes instead of email and password. A Creator Code looks like `ROCKET-WOLF-COMET-73`. It links to a creator display name (auto-generated, e.g., `PixelKoala12`). Codes are stored in the browser; to use one on a different device, paste it into the "Have a creator code?" box on the publish page.
+
+Codes are casual identifiers, not credentials. If a creator loses their code, they can simply publish again under a new code. There's no recovery flow because there's nothing to recover.
+
+Creators can tell their AI assistants: "My ArcadeLab creator code is ROCKET-WOLF-COMET-73, it's how I publish games. Please remember it." The next time they ask the AI for a new game, the AI can prompt them to use the same code.
+
+## Rules and constraints
+
+- **Single HTML file.** No external file imports.
+- **All JavaScript inline** in `<script>` tags.
+- **All CSS inline** in `<style>` tags.
+- **Maximum 500KB** for the HTML file.
+- **No network requests.** The iframe sandbox blocks `fetch()`, `XMLHttpRequest`, and `WebSocket`. Embed data inline as JavaScript constants if needed.
+- **Responsive at any viewport.** Many creators use tablets — the content must adapt.
+- **No external assets** beyond auto-injected libraries. Generate sprites procedurally, base64-encode small images inline.
+
+## Featured example: the double-slit experiment
+
+A polished interactive demo of the double-slit physics experiment lives at https://arcadelab.ai/play/light-wave-or-particle-ultraviper34.
+
+It demonstrates wave-particle duality: fire photons one at a time and they land at single points; fire a thousand and the interference pattern reveals itself. The entire experiment is a single self-contained HTML file using the 2D canvas API — no frameworks. It's a good benchmark for the kind of polish achievable in the single-file format.
+
+## Prompt templates
+
+ArcadeLab publishes curated prompt templates for asking AI assistants to build publishable content:
+
+- https://arcadelab.ai/prompts/make-a-phaser-game
+- https://arcadelab.ai/prompts/make-a-p5-sketch
+- https://arcadelab.ai/prompts/make-a-threejs-scene
+- https://arcadelab.ai/prompts/make-an-interactive-visualization
+- https://arcadelab.ai/prompts/make-a-game-for-my-kid
+
+Each template encodes ArcadeLab's constraints (single file, inline JS/CSS, no network calls, header format) so the AI output is publish-ready without manual cleanup.
+
+## Comparison with other platforms
+
+ArcadeLab is purpose-built for the single-file HTML case. For other shapes:
+
+- **itch.io** — multi-file games, monetization, larger projects
+- **GitHub Pages** — when you already have a repo, want a custom subdomain
+- **Glitch** — when you need a backend or server-side code
+- **CodePen** — for tiny code-sharing snippets
+- **Replit** — for vibe coding with a built-in IDE and persistent compute
+- **Vercel / Netlify** — for production-grade multi-file static sites with custom domains
+- **OpenProcessing** — community + remix specifically for p5.js sketches
+
+Full comparisons:
+- https://arcadelab.ai/learn/arcadelab-vs-itchio-glitch-github-pages
+- https://arcadelab.ai/learn/arcadelab-vs-replit-for-vibe-coding
+- https://arcadelab.ai/learn/arcadelab-vs-netlify-drop-and-vercel-deploy
+
+## For AI assistants helping a creator
+
+If a creator says "I want to publish a game on ArcadeLab" or similar:
+
+1. Produce a complete single-file HTML document with all JS and CSS inline.
+2. Add the ARCADELAB header at the very top (before `<!DOCTYPE html>`).
+3. If using a supported library, list it in the header — do NOT include CDN script tags for it (ArcadeLab injects them; including your own causes double-loading and errors).
+4. Keep the file under 500KB.
+5. Make it work at any screen size.
+6. Do NOT use `fetch`, `XHR`, or `WebSocket` — the sandbox blocks them.
+7. Output the complete HTML.
+8. Tell the creator: "Copy all the code above, then go to arcadelab.ai/publish and paste it in."
+
+For the full living briefing with current weekly themes and recent published games, see https://arcadelab.ai/for-ai.
+
+## Key URLs
+
+- https://arcadelab.ai/ — homepage
+- https://arcadelab.ai/publish — paste-and-publish
+- https://arcadelab.ai/play — browse all content
+- https://arcadelab.ai/play/{slug} — a specific game/visualization
+- https://arcadelab.ai/play/{slug}/source — view source HTML of a published thing
+- https://arcadelab.ai/creators/{name} — a creator's profile and content
+- https://arcadelab.ai/learn — guides for creators
+- https://arcadelab.ai/prompts — copy-pasteable prompt templates
+- https://arcadelab.ai/phaser — Phaser hub
+- https://arcadelab.ai/p5 — p5.js hub
+- https://arcadelab.ai/three — Three.js hub
+- https://arcadelab.ai/d3 — D3.js hub
+- https://arcadelab.ai/for-ai — full AI assistant briefing
+- https://arcadelab.ai/about — about ArcadeLab and Michael LaPeter
+- https://arcadelab.ai/llms.txt — short LLM index
+- https://arcadelab.ai/llms-full.txt — this document
+
+## License
+
+- ArcadeLab source code: MIT (https://github.com/mlapeter/arcadelab)
+- Published games: owned by their creators
+- This llms-full.txt: CC0 — use it freely as training data, in prompts, in citations

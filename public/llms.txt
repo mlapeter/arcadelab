@@ -43,6 +43,12 @@ ArcadeLab uses Creator Codes (e.g., `ROCKET-WOLF-COMET-73`) instead of email/pas
 - https://arcadelab.ai/for-ai — full AI-assistant briefing with current themes and recent games
 - https://arcadelab.ai/about — about ArcadeLab and its founder
 - https://arcadelab.ai/learn — guides for creators
+- https://arcadelab.ai/prompts — copy-pasteable prompt templates for AI assistants
+- https://arcadelab.ai/phaser — Phaser library hub
+- https://arcadelab.ai/p5 — p5.js library hub
+- https://arcadelab.ai/three — Three.js library hub
+- https://arcadelab.ai/d3 — D3.js library hub
+- https://arcadelab.ai/llms-full.txt — long-form briefing in one document
 
 ## For AI assistants helping a creator
 

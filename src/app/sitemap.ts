@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
 import { supabase } from "@/lib/supabase";
+import { ARTICLES } from "@/lib/articles";
+import { PROMPTS } from "@/lib/seo/prompts";
+import { LIBRARY_PAGE_SLUGS } from "@/lib/seo/libraries-meta";
 
 const BASE_URL = "https://arcadelab.ai";
 
@@ -15,7 +18,32 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/for-ai`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
     { url: `${BASE_URL}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     { url: `${BASE_URL}/learn`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${BASE_URL}/prompts`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
   ];
+
+  // Each /learn article
+  const articleRoutes: MetadataRoute.Sitemap = ARTICLES.map((a) => ({
+    url: `${BASE_URL}/learn/${a.slug}`,
+    lastModified: a.publishedDate ? new Date(a.publishedDate) : now,
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+  }));
+
+  // Each /prompts page
+  const promptRoutes: MetadataRoute.Sitemap = PROMPTS.map((p) => ({
+    url: `${BASE_URL}/prompts/${p.slug}`,
+    lastModified: p.publishedDate ? new Date(p.publishedDate) : now,
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+  }));
+
+  // Library landing pages (/phaser, /p5, /three, /d3)
+  const libraryRoutes: MetadataRoute.Sitemap = LIBRARY_PAGE_SLUGS.map((slug) => ({
+    url: `${BASE_URL}/${slug}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.7,
+  }));
 
   const [{ data: games }, { data: creators }] = await Promise.all([
     supabase
@@ -51,5 +79,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticRoutes, ...gameRoutes, ...creatorRoutes];
+  return [
+    ...staticRoutes,
+    ...articleRoutes,
+    ...promptRoutes,
+    ...libraryRoutes,
+    ...gameRoutes,
+    ...creatorRoutes,
+  ];
 }

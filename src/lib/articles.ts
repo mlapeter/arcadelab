@@ -5,6 +5,10 @@ export interface ArticleMeta {
   publishedDate: string;
   emoji: string;
   tagline: string;
+  /** Optional slug of a /prompts page that matches this article's workflow. */
+  relatedPromptSlug?: string;
+  /** Optional slug of a library hub (/phaser, /p5, etc.) this article relates to. */
+  relatedLibrarySlug?: "phaser" | "p5" | "three" | "d3";
 }
 
 export const ARTICLES: ArticleMeta[] = [
@@ -16,6 +20,7 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "🪄",
     tagline: "Paste the HTML. Get a URL. Share.",
+    relatedPromptSlug: "make-an-interactive-visualization",
   },
   {
     slug: "free-html-game-hosting-no-signup",
@@ -43,6 +48,7 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "🔬",
     tagline: "Make a thing. Share a thing.",
+    relatedPromptSlug: "make-an-interactive-visualization",
   },
   {
     slug: "host-phaser-game-no-build-tools",
@@ -52,6 +58,8 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "🟣",
     tagline: "Phaser-friendly. No webpack.",
+    relatedPromptSlug: "make-a-phaser-game",
+    relatedLibrarySlug: "phaser",
   },
   {
     slug: "share-p5js-sketch-as-playable-url",
@@ -61,6 +69,8 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "🎨",
     tagline: "p5 sketch → public URL in one paste.",
+    relatedPromptSlug: "make-a-p5-sketch",
+    relatedLibrarySlug: "p5",
   },
   {
     slug: "publish-threejs-scene-single-file",
@@ -70,6 +80,8 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "🧊",
     tagline: "Three.js + one file + one paste.",
+    relatedPromptSlug: "make-a-threejs-scene",
+    relatedLibrarySlug: "three",
   },
   {
     slug: "share-d3-visualization-no-build",
@@ -79,6 +91,8 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "📊",
     tagline: "D3 viz → URL in 30 seconds.",
+    relatedPromptSlug: "make-an-interactive-visualization",
+    relatedLibrarySlug: "d3",
   },
   {
     slug: "help-kid-share-game-made-with-ai",
@@ -88,6 +102,7 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "🧒",
     tagline: "No accounts. No emails. Just play.",
+    relatedPromptSlug: "make-a-game-for-my-kid",
   },
   {
     slug: "arcadelab-vs-itchio-glitch-github-pages",
@@ -97,6 +112,24 @@ export const ARTICLES: ArticleMeta[] = [
     publishedDate: "2026-05-13",
     emoji: "⚖️",
     tagline: "When ArcadeLab fits, and when something else does.",
+  },
+  {
+    slug: "arcadelab-vs-replit-for-vibe-coding",
+    title: "ArcadeLab vs Replit for publishing AI-generated apps — which fits?",
+    description:
+      "Replit is a full vibe-coding IDE with hosting; ArcadeLab is a paste-and-publish destination for single-file HTML output. When to use each.",
+    publishedDate: "2026-05-14",
+    emoji: "🆚",
+    tagline: "IDE-plus-hosting vs. paste-and-publish — different shapes.",
+  },
+  {
+    slug: "arcadelab-vs-netlify-drop-and-vercel-deploy",
+    title: "ArcadeLab vs Netlify Drop vs Vercel — which to use for single-file HTML?",
+    description:
+      "Netlify Drop and Vercel are great static hosts but want a build pipeline or drag-and-drop a folder. ArcadeLab takes a single pasted HTML file. Tradeoffs explained.",
+    publishedDate: "2026-05-14",
+    emoji: "📦",
+    tagline: "Build-and-deploy vs. paste-the-HTML.",
   },
 ];
 

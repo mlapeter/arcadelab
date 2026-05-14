@@ -1,6 +1,8 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import { ArticleMeta, getRelatedArticles } from "@/lib/articles";
+import { getPrompt } from "@/lib/seo/prompts";
+import { getLibraryMeta } from "@/lib/seo/libraries-meta";
 import { articleSchema, breadcrumbSchema, organizationSchema, FaqEntry, faqPageSchema, howToSchema, HowToStep } from "@/lib/schema";
 import JsonLd from "@/components/JsonLd";
 import RelatedArticles from "@/components/RelatedArticles";
@@ -17,6 +19,8 @@ export default function ArticleLayout({ article, children, faqs, howTo }: Props)
   const url = `https://arcadelab.ai/learn/${article.slug}`;
   const imageUrl = `https://arcadelab.ai/learn/${article.slug}/opengraph-image`;
   const related = getRelatedArticles(article.slug, 3);
+  const relatedPrompt = article.relatedPromptSlug ? getPrompt(article.relatedPromptSlug) : undefined;
+  const relatedLibrary = article.relatedLibrarySlug ? getLibraryMeta(article.relatedLibrarySlug) : undefined;
 
   const schemas: object[] = [
     organizationSchema(),
@@ -63,6 +67,35 @@ export default function ArticleLayout({ article, children, faqs, howTo }: Props)
         <div className="prose-arcade text-[11px] leading-relaxed text-wood-mid normal-case">
           {children}
         </div>
+
+        {(relatedPrompt || relatedLibrary) && (
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {relatedPrompt && (
+              <Link
+                href={`/prompts/${relatedPrompt.slug}`}
+                className="rpg-panel p-3 hover:bg-wood-mid/5 transition-colors"
+              >
+                <p className="text-[10px] text-wood-mid/60 normal-case mb-1">Prompt template</p>
+                <p className="text-[10px] text-accent-purple normal-case">
+                  <span className="mr-1">{relatedPrompt.emoji}</span>
+                  {relatedPrompt.title}
+                </p>
+              </Link>
+            )}
+            {relatedLibrary && (
+              <Link
+                href={`/${relatedLibrary.slug}`}
+                className="rpg-panel p-3 hover:bg-wood-mid/5 transition-colors"
+              >
+                <p className="text-[10px] text-wood-mid/60 normal-case mb-1">Library hub</p>
+                <p className="text-[10px] text-accent-purple normal-case">
+                  <span className="mr-1">{relatedLibrary.emoji}</span>
+                  {relatedLibrary.longName} on ArcadeLab
+                </p>
+              </Link>
+            )}
+          </div>
+        )}
 
         <ArticleCTA />
         <RelatedArticles articles={related} />

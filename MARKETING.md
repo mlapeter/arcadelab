@@ -572,16 +572,28 @@ The agent should append to this section after each work session.
 - Page titles were doubling "— ArcadeLab — ArcadeLab" on game/source/creator pages (layout template + hard-coded suffix). Fixed in `fc71b93`.
 - Rich Results flagged "missing image" non-critical on Article schema. Added dynamic OG image for /learn/[slug] in `5758c57`. Each guide now has 1200x630 card with emoji + title + tagline + brand.
 
-**Phase 2 first moves:**
-- **P2.1 GitHub repo metadata** — done in previous session (description, 20 topics, homepage URL)
-- **P2.3 awesome-* list PR #1 shipped:** Added ArcadeLab to `filipecalegario/awesome-vibe-coding` (4,379 stars) under Communities & Job Boards. PR: https://github.com/filipecalegario/awesome-vibe-coding/pull/182
-- **P2.3 deferred candidates** (waiting for more traction before submitting): `terkelg/awesome-creative-coding` (14.8k stars, has "wait a couple weeks" guideline), `dawdle-deer/awesome-learn-gamedev` (3.4k), `MooseTheRebel/awesome-static-hosting-and-cms` (313), `ai-for-developers/awesome-vibe-coding` (708)
+**Phase 2 — five awesome-* PRs shipped:**
+1. **PR #182** → [`filipecalegario/awesome-vibe-coding`](https://github.com/filipecalegario/awesome-vibe-coding/pull/182) (4,379 ⭐, Communities & Job Boards)
+2. **PR #250** → [`terkelg/awesome-creative-coding`](https://github.com/terkelg/awesome-creative-coding/pull/250) (14,800 ⭐, Tools > Online — user explicitly approved despite "wait a couple weeks" guideline)
+3. **PR #61** → [`ai-for-developers/awesome-vibe-coding`](https://github.com/ai-for-developers/awesome-vibe-coding/pull/61) (708 ⭐, Web-Based Builders)
+4. **PR #47** → [`SecretiveShell/Awesome-llms-txt`](https://github.com/SecretiveShell/Awesome-llms-txt/pull/47) (98 ⭐, alphabetical index of llms.txt files)
+5. **PR #2** → [`cid-ku/awesome-browser-game-sites`](https://github.com/cid-ku/awesome-browser-game-sites/pull/2) (3 ⭐, Featured Browser Game Sites)
 
-**Still pending in Phase 2:**
-- P2.2 Wikidata entry
-- P2.3b AlternativeTo listing
-- P2.4 dev.to / Hashnode cross-posts (needs human input — which account, when)
-- P2.5 narrative HN piece (gated on D4)
+Total combined exposure: ~20k stars. P2.1 GitHub repo metadata already done in earlier session.
+
+**Phase 2 — investigated but skipped (poor fit):**
+- `MooseTheRebel/awesome-static-hosting-and-cms` (313 ⭐) — list is mostly articles, not hosting providers
+- `aharris88/awesome-static-website-services` (1,970 ⭐) — about services FOR static sites (forms, payments), not hosts
+- `dawdle-deer/awesome-learn-gamedev` (3,400 ⭐) — learning resources only, no publishing/platform section
+- `ellisonleao/magictools` (16,600 ⭐) — creation tools only, no publishing section
+- `tristandenyer/awesome-ai-website-files` (5 ⭐) — about the specs themselves, not example sites
+- Various 0-star AEO lists — no audience/leverage
+
+**Phase 2 — paused on human action:**
+- **P2.3b AlternativeTo**: Hit hCaptcha + email field after Google sign-up was rejected. Needs user to complete signup (GitHub OAuth was authorized; AlternativeTo wants email + captcha for full account creation).
+- **P2.2 Wikidata**: Form is open and anonymous editing is allowed, but notability is borderline. Deferred until awesome-* PRs merge → those become "publicly available references" that strengthen the case. Revisit ~2 weeks.
+- **P2.4 dev.to / Hashnode cross-posts**: Needs decision on account + which articles to cross-post first.
+- **P2.5 narrative HN piece**: Still gated on D4.
 
 ### 2026-05-13 — Deploy + dashboard setup completed via Playwright browser session
 

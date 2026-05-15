@@ -131,6 +131,33 @@ export const ARTICLES: ArticleMeta[] = [
     emoji: "📦",
     tagline: "Build-and-deploy vs. paste-the-HTML.",
   },
+  {
+    slug: "vibe-coding-publish-platforms",
+    title: "Where can I publish something I vibe-coded?",
+    description:
+      "A practical guide to publishing destinations for vibe-coded projects — from single-file HTML games to full apps — and which tool fits which output.",
+    publishedDate: "2026-05-15",
+    emoji: "🌊",
+    tagline: "From prototype to public URL.",
+  },
+  {
+    slug: "cursor-bolt-claude-publishing-workflow",
+    title: "How do I publish what I built with Cursor, Bolt, or an AI assistant?",
+    description:
+      "A step-by-step workflow for taking output from Cursor, Bolt, v0, Claude, or any AI coding tool and turning it into a public URL.",
+    publishedDate: "2026-05-15",
+    emoji: "🛠️",
+    tagline: "From AI output to a public link.",
+  },
+  {
+    slug: "single-file-html-game-template",
+    title: "What is a good single-file HTML game template?",
+    description:
+      "A clean, copy-paste single-file HTML game template — canvas setup, game loop, and input handling — ready to extend or hand to an AI assistant.",
+    publishedDate: "2026-05-15",
+    emoji: "📐",
+    tagline: "A starting skeleton for any browser game.",
+  },
 ];
 
 export function getArticle(slug: string): ArticleMeta | undefined {

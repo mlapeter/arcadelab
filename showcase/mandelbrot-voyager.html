@@ -1,0 +1,474 @@
+<!--ARCADELAB
+title: Mandelbrot Voyager
+description: An interactive Mandelbrot set explorer — tap to zoom into infinite fractal detail with smooth continuous coloring.
+emoji: 🌀
+color: teal
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mandelbrot Voyager</title>
+<style>
+  :root {
+    --bg: #061016;
+    --panel: rgba(8, 24, 30, 0.82);
+    --accent: #2dd4bf;
+    --accent-dim: #14b8a6;
+    --text: #d6f5f0;
+    --muted: #6fa9a2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    position: fixed;
+    inset: 0;
+  }
+  canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+  }
+  .overlay {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+  }
+  /* Title card */
+  #titlecard {
+    top: 14px;
+    left: 14px;
+    max-width: min(78vw, 360px);
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(45, 212, 191, 0.28);
+    border-radius: 16px;
+    padding: 12px 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    animation: drift 0.7s cubic-bezier(.2,.8,.2,1) both;
+  }
+  #titlecard h1 {
+    margin: 0;
+    font-size: clamp(16px, 4.4vw, 21px);
+    letter-spacing: 0.2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #titlecard p {
+    margin: 5px 0 0;
+    font-size: clamp(12px, 3.2vw, 13.5px);
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  /* Stats */
+  #stats {
+    bottom: 14px;
+    left: 14px;
+    background: var(--panel);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(45, 212, 191, 0.22);
+    border-radius: 14px;
+    padding: 9px 13px;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.6;
+    animation: drift 0.7s 0.08s cubic-bezier(.2,.8,.2,1) both;
+  }
+  #stats .label { color: var(--muted); }
+  #stats .val { color: var(--accent); font-weight: 600; }
+  /* Controls */
+  #controls {
+    position: absolute;
+    z-index: 6;
+    bottom: 14px;
+    right: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    max-width: calc(100vw - 28px);
+    animation: drift 0.7s 0.14s cubic-bezier(.2,.8,.2,1) both;
+  }
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    background: linear-gradient(180deg, rgba(45,212,191,0.22), rgba(20,184,166,0.12));
+    border: 1px solid rgba(45, 212, 191, 0.4);
+    border-radius: 13px;
+    padding: 11px 16px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+    touch-action: manipulation;
+  }
+  button:hover { background: linear-gradient(180deg, rgba(45,212,191,0.34), rgba(20,184,166,0.2)); }
+  button:active { transform: scale(0.94); }
+  button:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+  }
+  /* Rendering indicator */
+  #status {
+    top: 14px;
+    right: 14px;
+    background: var(--panel);
+    border: 1px solid rgba(45, 212, 191, 0.28);
+    border-radius: 12px;
+    padding: 7px 12px;
+    font-size: 12.5px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  #status.show { opacity: 1; }
+  .spinner {
+    width: 11px;
+    height: 11px;
+    border: 2px solid rgba(45,212,191,0.3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes drift {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* On narrow screens, stack stats above the controls so they don't overlap */
+  @media (max-width: 540px) {
+    #stats { bottom: 70px; }
+  }
+  /* progress bar at very bottom */
+  #progress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 3px;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent));
+    box-shadow: 0 0 8px var(--accent);
+    z-index: 7;
+    transition: width 0.08s linear, opacity 0.3s ease;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="view"></canvas>
+  <div id="titlecard" class="overlay">
+    <h1><span>🌀</span> Mandelbrot Voyager</h1>
+    <p>Tap or click anywhere to dive deeper into the fractal.</p>
+  </div>
+  <div id="status" class="overlay"><span class="spinner"></span><span>rendering…</span></div>
+  <div id="stats" class="overlay">
+    <div><span class="label">center</span> <span class="val" id="s-center">0, 0</span></div>
+    <div><span class="label">zoom</span> <span class="val" id="s-zoom">1×</span> &nbsp; <span class="label">iter</span> <span class="val" id="s-iter">100</span></div>
+  </div>
+  <div id="controls">
+    <button id="btn-out">Zoom out</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+  <div id="progress"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("view");
+  var ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) { return; }
+
+  var statusEl = document.getElementById("status");
+  var progressEl = document.getElementById("progress");
+  var sCenter = document.getElementById("s-center");
+  var sZoom = document.getElementById("s-zoom");
+  var sIter = document.getElementById("s-iter");
+  var btnOut = document.getElementById("btn-out");
+  var btnReset = document.getElementById("btn-reset");
+
+  // --- view state (complex plane) ---------------------------------------
+  var HOME = { cx: -0.65, cy: 0.0, span: 3.4 }; // span = width of view in plane units
+  var view = { cx: HOME.cx, cy: HOME.cy, span: HOME.span };
+
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 0, H = 0;          // device pixels
+  var imgData = null;
+  var pixels = null;         // Uint32 view of imgData
+  var renderToken = 0;       // cancels stale renders
+
+  // --- color gradient: smooth teal/aqua -> gold -> deep navy -------------
+  // Precompute a 2048-entry palette for speed.
+  var PAL_SIZE = 2048;
+  var palette = new Uint32Array(PAL_SIZE);
+  (function buildPalette() {
+    // control stops (t, r, g, b)
+    var stops = [
+      [0.00, 8, 14, 26],
+      [0.16, 14, 60, 92],
+      [0.36, 36, 168, 170],
+      [0.52, 132, 232, 214],
+      [0.66, 244, 232, 188],
+      [0.80, 232, 158, 70],
+      [0.92, 120, 44, 60],
+      [1.00, 12, 18, 34]
+    ];
+    for (var i = 0; i < PAL_SIZE; i++) {
+      var t = i / (PAL_SIZE - 1);
+      var a = stops[0], b = stops[stops.length - 1];
+      for (var s = 0; s < stops.length - 1; s++) {
+        if (t >= stops[s][0] && t <= stops[s + 1][0]) { a = stops[s]; b = stops[s + 1]; break; }
+      }
+      var range = b[0] - a[0];
+      var f = range > 0 ? (t - a[0]) / range : 0;
+      f = f * f * (3 - 2 * f); // smoothstep
+      var r = Math.round(a[1] + (b[1] - a[1]) * f);
+      var g = Math.round(a[2] + (b[2] - a[2]) * f);
+      var bl = Math.round(a[3] + (b[3] - a[3]) * f);
+      palette[i] = (255 << 24) | (bl << 16) | (g << 8) | r; // ABGR (little-endian)
+    }
+  })();
+  var INSIDE_COLOR = (255 << 24) | (10 << 16) | (8 << 8) | 6; // near-black for set interior
+
+  // --- iteration count scales with zoom depth ---------------------------
+  function maxIterForSpan(span) {
+    var depth = Math.log2(HOME.span / span); // 0 at home, grows as we zoom in
+    var it = Math.round(120 + depth * 42);
+    return Math.max(120, Math.min(it, 2200));
+  }
+
+  // --- resize ------------------------------------------------------------
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var rect = canvas.getBoundingClientRect();
+    var cw = Math.max(1, Math.floor(rect.width));
+    var ch = Math.max(1, Math.floor(rect.height));
+    W = Math.max(1, Math.floor(cw * dpr));
+    H = Math.max(1, Math.floor(ch * dpr));
+    canvas.width = W;
+    canvas.height = H;
+    imgData = ctx.createImageData(W, H);
+    pixels = new Uint32Array(imgData.data.buffer);
+    render();
+  }
+
+  // --- render in chunks via requestAnimationFrame ------------------------
+  var renderRAF = 0;
+  function render() {
+    if (!imgData || W < 1 || H < 1) { return; }
+    var token = ++renderToken;
+    if (renderRAF) { cancelAnimationFrame(renderRAF); renderRAF = 0; }
+
+    var maxIter = maxIterForSpan(view.span);
+    updateStats(maxIter);
+
+    // map: pixel (px,py) -> complex (re,im)
+    var aspect = H / W;
+    var spanX = view.span;
+    var spanY = view.span * aspect;
+    var x0 = view.cx - spanX / 2;
+    var y0 = view.cy - spanY / 2;
+    var dx = spanX / W;
+    var dy = spanY / H;
+
+    var logEsc = Math.log(2.0); // for smooth coloring (escape radius 2)
+    var invLog2 = 1 / Math.log(2);
+    var paletteScale = PAL_SIZE; // colorScale below maps fractional iter to palette
+
+    var row = 0;
+    var ROWS_PER_FRAME_BASE = Math.max(2, Math.round(28000 / W)); // ~constant pixels/frame
+
+    statusEl.classList.add("show");
+    progressEl.style.opacity = "1";
+
+    function chunk() {
+      if (token !== renderToken) { return; } // superseded
+      var startTime = performance.now();
+      var rowsPerFrame = ROWS_PER_FRAME_BASE;
+      var processed = 0;
+
+      while (row < H) {
+        var im = y0 + row * dy;
+        var base = row * W;
+        for (var px = 0; px < W; px++) {
+          var re = x0 + px * dx;
+          // cardioid / period-2 bulb quick-reject (skips expensive interior)
+          var xq = re - 0.25;
+          var q = xq * xq + im * im;
+          if (q * (q + xq) <= 0.25 * im * im ||
+              (re + 1) * (re + 1) + im * im <= 0.0625) {
+            pixels[base + px] = INSIDE_COLOR;
+            continue;
+          }
+          var zr = 0.0, zi = 0.0;
+          var zr2 = 0.0, zi2 = 0.0;
+          var iter = 0;
+          while (zr2 + zi2 <= 4.0 && iter < maxIter) {
+            zi = 2.0 * zr * zi + im;
+            zr = zr2 - zi2 + re;
+            zr2 = zr * zr;
+            zi2 = zi * zi;
+            iter++;
+          }
+          if (iter >= maxIter) {
+            pixels[base + px] = INSIDE_COLOR;
+          } else {
+            // smooth (continuous) iteration count
+            var logZn = Math.log(zr2 + zi2) * 0.5;
+            var nu = Math.log(logZn / logEsc) * invLog2;
+            var smooth = iter + 1 - nu;
+            if (smooth < 0) { smooth = 0; }
+            // map onto palette with a gentle cyclic scale
+            var ci = (smooth * 12.0) % PAL_SIZE;
+            if (ci < 0) { ci += PAL_SIZE; }
+            pixels[base + px] = palette[ci | 0];
+          }
+        }
+        row++;
+        processed++;
+        // adaptive: keep each frame under ~14ms so UI stays responsive
+        if (processed >= rowsPerFrame) {
+          if (performance.now() - startTime > 13) { break; }
+          rowsPerFrame += ROWS_PER_FRAME_BASE;
+        }
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+      progressEl.style.width = (100 * row / H) + "%";
+
+      if (row < H) {
+        renderRAF = requestAnimationFrame(chunk);
+      } else {
+        renderRAF = 0;
+        statusEl.classList.remove("show");
+        progressEl.style.opacity = "0";
+        progressEl.style.width = "0%";
+      }
+    }
+    renderRAF = requestAnimationFrame(chunk);
+  }
+
+  // --- stats display -----------------------------------------------------
+  function fmt(n) {
+    var abs = Math.abs(n);
+    var digits = abs < 1e-3 ? 8 : (abs < 1 ? 6 : 4);
+    return n.toFixed(digits);
+  }
+  function updateStats(maxIter) {
+    sCenter.textContent = fmt(view.cx) + ", " + fmt(view.cy);
+    var zoom = HOME.span / view.span;
+    var zStr;
+    if (zoom >= 1e6) { zStr = zoom.toExponential(1).replace("e+", "e") + "×"; }
+    else if (zoom >= 1000) { zStr = Math.round(zoom / 1000) + "k×"; }
+    else if (zoom >= 10) { zStr = Math.round(zoom) + "×"; }
+    else { zStr = zoom.toFixed(1) + "×"; }
+    sZoom.textContent = zStr;
+    sIter.textContent = String(maxIter);
+  }
+
+  // --- interaction -------------------------------------------------------
+  function zoomAt(clientX, clientY, factor) {
+    var rect = canvas.getBoundingClientRect();
+    var fx = (clientX - rect.left) / rect.width;   // 0..1
+    var fy = (clientY - rect.top) / rect.height;   // 0..1
+    var aspect = (rect.height) / (rect.width);
+    var spanX = view.span;
+    var spanY = view.span * aspect;
+    // complex coordinate under the cursor
+    var targetX = view.cx - spanX / 2 + fx * spanX;
+    var targetY = view.cy - spanY / 2 + fy * spanY;
+    // zoom so that the cursor point stays put
+    view.span *= factor;
+    // clamp zoom-out to home, clamp zoom-in to double precision sanity
+    if (view.span > HOME.span) { view.span = HOME.span; }
+    if (view.span < 1e-13) { view.span = 1e-13; }
+    if (factor < 1) {
+      view.cx = targetX;
+      view.cy = targetY;
+    } else {
+      // recenter gently toward home on zoom-out
+      view.cx = view.cx + (targetX - view.cx) * 0.0;
+    }
+    render();
+  }
+
+  // pointer: tap zooms in, distinguishing tap from (ignored) drags
+  var down = null;
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    down = { x: e.clientX, y: e.clientY, t: performance.now() };
+  }, { passive: false });
+
+  canvas.addEventListener("pointerup", function (e) {
+    e.preventDefault();
+    if (!down) { return; }
+    var moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+    var dt = performance.now() - down.t;
+    var d = down;
+    down = null;
+    if (moved < 12 && dt < 700) {
+      zoomAt(e.clientX, e.clientY, 0.4); // dive in 2.5×
+    }
+  }, { passive: false });
+
+  canvas.addEventListener("pointercancel", function () { down = null; });
+
+  // wheel zoom (desktop nicety) toward cursor
+  canvas.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1.25 : 0.8);
+  }, { passive: false });
+
+  btnOut.addEventListener("click", function () {
+    var rect = canvas.getBoundingClientRect();
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 2.5);
+  });
+
+  btnReset.addEventListener("click", function () {
+    view.cx = HOME.cx;
+    view.cy = HOME.cy;
+    view.span = HOME.span;
+    render();
+  });
+
+  // --- resize handling (debounced) --------------------------------------
+  var resizeTimer = 0;
+  window.addEventListener("resize", function () {
+    if (resizeTimer) { clearTimeout(resizeTimer); }
+    resizeTimer = setTimeout(function () { resizeTimer = 0; resize(); }, 140);
+  });
+  window.addEventListener("orientationchange", function () {
+    setTimeout(resize, 200);
+  });
+
+  // --- boot --------------------------------------------------------------
+  resize(); // lays out + does first render
+})();
+</script>
+</body>
+</html>

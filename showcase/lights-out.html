@@ -1,0 +1,490 @@
+<!--ARCADELAB
+title: Lights Out
+description: The classic Lights Out puzzle — tap a light to flip it and its neighbors, and switch every light off to win.
+emoji: 💡
+color: gold
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lights Out</title>
+<style>
+  :root {
+    --bg: #15110a;
+    --panel: rgba(36, 28, 12, 0.78);
+    --line: rgba(240, 196, 88, 0.24);
+    --gold: #f4c54a;
+    --gold-soft: #ffe39a;
+    --text: #f3e9cf;
+    --muted: #a5926a;
+    --off: #2a2210;
+    --off-edge: #3d3015;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background:
+      radial-gradient(800px 540px at 50% -8%, rgba(244, 197, 74, 0.13), transparent 62%),
+      var(--bg);
+  }
+
+  header {
+    text-align: center;
+    padding: 16px 14px 4px;
+    animation: fade 0.6s ease both;
+  }
+  header h1 {
+    margin: 0;
+    font-size: clamp(19px, 3vw, 26px);
+    font-weight: 750;
+    letter-spacing: 0.2px;
+  }
+  header p {
+    margin: 4px 0 0;
+    font-size: clamp(12px, 1.7vw, 14px);
+    color: var(--muted);
+  }
+
+  #stats {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0 4px;
+    animation: fade 0.6s ease 0.05s both;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 7px 14px;
+    text-align: center;
+    min-width: 78px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .stat .k {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .stat .v {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--gold-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  #boardWrap {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 8px 16px;
+    min-height: 0;
+  }
+  #board {
+    display: grid;
+    gap: clamp(7px, 1.6vw, 12px);
+    width: min(86vw, 60vh, 460px);
+    aspect-ratio: 1;
+    animation: pop 0.55s cubic-bezier(0.2, 0.85, 0.2, 1) both;
+  }
+  .cell {
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    padding: 0;
+    background: var(--off);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.55), inset 0 0 0 1.5px var(--off-edge);
+    transition: background 0.26s ease, box-shadow 0.26s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .cell:active { transform: scale(0.93); }
+  .cell.on {
+    background: radial-gradient(circle at 38% 32%, var(--gold-soft), var(--gold) 62%, #c9982e);
+    box-shadow:
+      0 0 16px rgba(244, 197, 74, 0.55),
+      0 0 36px rgba(244, 197, 74, 0.28),
+      inset 0 1px 6px rgba(255, 255, 255, 0.45);
+  }
+  #board.win .cell {
+    animation: winpulse 0.9s ease;
+  }
+
+  #controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 9px;
+    padding: 6px 16px max(16px, env(safe-area-inset-bottom));
+    animation: fade 0.6s ease 0.1s both;
+  }
+  button.ctl {
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: #1a1407;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+    border: none;
+    border-radius: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease;
+  }
+  button.ctl.ghost {
+    color: var(--gold-soft);
+    background: var(--panel);
+    border: 1px solid var(--line);
+  }
+  button.ctl:hover { filter: brightness(1.07); }
+  button.ctl:active { transform: scale(0.95); }
+  #size {
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: var(--gold-soft);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+  }
+
+  #win {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  #win.show { opacity: 1; pointer-events: auto; }
+  #winCard {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 26px 32px;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    transform: scale(0.85);
+    transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.2, 1.3);
+  }
+  #win.show #winCard { transform: scale(1); }
+  #winCard .big { font-size: 46px; }
+  #winCard h2 {
+    margin: 6px 0 2px;
+    font-size: 24px;
+    color: var(--gold-soft);
+  }
+  #winCard p {
+    margin: 0 0 16px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  #confetti {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes pop { from { opacity: 0; transform: scale(0.9); } }
+  @keyframes winpulse {
+    0% { transform: scale(1); }
+    45% { transform: scale(1.07); }
+    100% { transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>💡 Lights Out</h1>
+    <p>Tap a light to flip it and its neighbors. Turn them all off!</p>
+  </header>
+
+  <div id="stats">
+    <div class="stat"><div class="k">Moves</div><div class="v" id="moves">0</div></div>
+    <div class="stat"><div class="k">Time</div><div class="v" id="time">0:00</div></div>
+    <div class="stat"><div class="k">Lit</div><div class="v" id="lit">0</div></div>
+  </div>
+
+  <div id="boardWrap">
+    <div id="board"></div>
+  </div>
+
+  <div id="controls">
+    <select id="size" aria-label="Grid size">
+      <option value="3">3 × 3</option>
+      <option value="5" selected>5 × 5</option>
+    </select>
+    <button class="ctl" id="newBtn">New Puzzle</button>
+    <button class="ctl ghost" id="restartBtn">Restart</button>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<div id="win">
+  <div id="winCard">
+    <div class="big">🎉</div>
+    <h2>Lights Out!</h2>
+    <p id="winStats">Solved it.</p>
+    <button class="ctl" id="winNew">New Puzzle</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var boardEl = document.getElementById("board");
+  var movesEl = document.getElementById("moves");
+  var timeEl = document.getElementById("time");
+  var litEl = document.getElementById("lit");
+  var sizeEl = document.getElementById("size");
+  var winEl = document.getElementById("win");
+  var winStatsEl = document.getElementById("winStats");
+
+  var N = 5;
+  var grid = [];        // current state (1 = on)
+  var startGrid = [];   // snapshot for Restart
+  var cells = [];       // button elements
+  var moves = 0;
+  var solved = false;
+  var startTime = 0;
+  var timerId = 0;
+
+  function fmtTime(ms) {
+    var s = Math.floor(ms / 1000);
+    var m = Math.floor(s / 60);
+    var ss = s % 60;
+    return m + ":" + (ss < 10 ? "0" : "") + ss;
+  }
+
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = 0; }
+  }
+  function startTimer() {
+    stopTimer();
+    startTime = Date.now();
+    timeEl.textContent = "0:00";
+    timerId = setInterval(function () {
+      if (!solved) timeEl.textContent = fmtTime(Date.now() - startTime);
+    }, 1000);
+  }
+
+  function countLit() {
+    var c = 0;
+    for (var i = 0; i < grid.length; i++) c += grid[i];
+    return c;
+  }
+
+  function render() {
+    for (var i = 0; i < grid.length; i++) {
+      if (grid[i]) cells[i].classList.add("on");
+      else cells[i].classList.remove("on");
+    }
+    var lit = countLit();
+    litEl.textContent = lit;
+    movesEl.textContent = moves;
+  }
+
+  function buildBoard() {
+    boardEl.innerHTML = "";
+    boardEl.classList.remove("win");
+    boardEl.style.gridTemplateColumns = "repeat(" + N + ", 1fr)";
+    cells = [];
+    for (var i = 0; i < N * N; i++) {
+      (function (idx) {
+        var b = document.createElement("button");
+        b.className = "cell";
+        b.setAttribute("aria-label", "light " + (idx + 1));
+        b.addEventListener("click", function () { onPress(idx); });
+        boardEl.appendChild(b);
+        cells.push(b);
+      })(i);
+    }
+  }
+
+  function pressAt(g, r, c) {
+    var i = r * N + c;
+    g[i] ^= 1;
+    if (r > 0) g[i - N] ^= 1;
+    if (r < N - 1) g[i + N] ^= 1;
+    if (c > 0) g[i - 1] ^= 1;
+    if (c < N - 1) g[i + 1] ^= 1;
+  }
+
+  function newPuzzle() {
+    solved = false;
+    moves = 0;
+    grid = [];
+    for (var i = 0; i < N * N; i++) grid.push(0);
+    // apply N random valid presses -> guaranteed solvable, never all-off
+    var presses = N === 3 ? 5 : 9;
+    for (var p = 0; p < presses; p++) {
+      pressAt(grid, (Math.random() * N) | 0, (Math.random() * N) | 0);
+    }
+    if (countLit() === 0) pressAt(grid, (Math.random() * N) | 0, (Math.random() * N) | 0);
+    startGrid = grid.slice();
+    render();
+    startTimer();
+  }
+
+  function restart() {
+    if (!startGrid.length) return;
+    solved = false;
+    moves = 0;
+    grid = startGrid.slice();
+    boardEl.classList.remove("win");
+    render();
+    startTimer();
+  }
+
+  function onPress(idx) {
+    if (solved) return;
+    var r = (idx / N) | 0;
+    var c = idx % N;
+    pressAt(grid, r, c);
+    moves++;
+    render();
+    if (countLit() === 0) win();
+  }
+
+  function win() {
+    solved = true;
+    stopTimer();
+    boardEl.classList.add("win");
+    var t = fmtTime(Date.now() - startTime);
+    winStatsEl.textContent = "Solved in " + moves + " move" + (moves === 1 ? "" : "s") + " · " + t;
+    winEl.classList.add("show");
+    burstConfetti();
+  }
+
+  // ----- confetti -----
+  var conf = document.getElementById("confetti");
+  var cctx = conf ? conf.getContext("2d") : null;
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var pieces = [];
+  var confettiRunning = false;
+
+  function sizeConfetti() {
+    if (!conf) return;
+    conf.width = Math.round(window.innerWidth * DPR);
+    conf.height = Math.round(window.innerHeight * DPR);
+    conf.style.width = window.innerWidth + "px";
+    conf.style.height = window.innerHeight + "px";
+    if (cctx) cctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function burstConfetti() {
+    if (!cctx) return;
+    var colors = ["#f4c54a", "#ffe39a", "#ff9d5c", "#7ff0e7", "#fff3d1"];
+    pieces = [];
+    var cx = window.innerWidth / 2;
+    for (var i = 0; i < 130; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var sp = 3 + Math.random() * 9;
+      pieces.push({
+        x: cx + (Math.random() - 0.5) * 80,
+        y: window.innerHeight * 0.42,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 4,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 0.4,
+        w: 5 + Math.random() * 7,
+        h: 8 + Math.random() * 8,
+        color: colors[(Math.random() * colors.length) | 0],
+        life: 1
+      });
+    }
+    if (!confettiRunning) {
+      confettiRunning = true;
+      requestAnimationFrame(confettiLoop);
+    }
+  }
+
+  function confettiLoop() {
+    if (!cctx) return;
+    cctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    var alive = 0;
+    for (var i = 0; i < pieces.length; i++) {
+      var p = pieces[i];
+      if (p.life <= 0) continue;
+      alive++;
+      p.vy += 0.22;
+      p.vx *= 0.99;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      if (p.y > window.innerHeight + 40) p.life = 0;
+      else p.life -= 0.004;
+      cctx.save();
+      cctx.translate(p.x, p.y);
+      cctx.rotate(p.rot);
+      cctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+      cctx.fillStyle = p.color;
+      cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      cctx.restore();
+    }
+    if (alive > 0) {
+      requestAnimationFrame(confettiLoop);
+    } else {
+      confettiRunning = false;
+      cctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    }
+  }
+
+  // ----- controls -----
+  document.getElementById("newBtn").addEventListener("click", function () {
+    winEl.classList.remove("show");
+    newPuzzle();
+  });
+  document.getElementById("winNew").addEventListener("click", function () {
+    winEl.classList.remove("show");
+    newPuzzle();
+  });
+  document.getElementById("restartBtn").addEventListener("click", function () {
+    winEl.classList.remove("show");
+    restart();
+  });
+  sizeEl.addEventListener("change", function () {
+    N = +sizeEl.value;
+    winEl.classList.remove("show");
+    buildBoard();
+    newPuzzle();
+  });
+
+  window.addEventListener("resize", sizeConfetti);
+
+  // ----- boot -----
+  sizeConfetti();
+  N = +sizeEl.value;
+  buildBoard();
+  newPuzzle();
+})();
+</script>
+</body>
+</html>

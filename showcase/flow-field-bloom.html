@@ -1,0 +1,464 @@
+<!--ARCADELAB
+title: Flow Field Bloom
+description: A generative flow-field painting — hundreds of particles drift along an evolving vector field, and a tap drops a blooming swirl of color.
+emoji: 🎨
+color: pink
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Flow Field Bloom</title>
+<style>
+  :root {
+    --bg: #0c0810;
+    --panel: rgba(34, 18, 30, 0.82);
+    --accent: #ff8fc4;
+    --text: #fdeef6;
+    --muted: #d7b8c9;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(255, 143, 196, 0.30);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 143, 196, 0.34);
+    border-radius: 13px;
+    padding: 9px 14px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(58, 30, 48, 0.92); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: center;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(255, 143, 196, 0.22);
+    border-radius: 13px;
+    padding: 8px 14px;
+    font-size: clamp(12px, 3.4vw, 14px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 4px;
+    vertical-align: -1px;
+    margin: 0 1px;
+    box-shadow: 0 0 6px rgba(255,255,255,0.25);
+  }
+  #stage { opacity: 0; transition: opacity .9s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🎨</span><span>Flow Field Bloom</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="palette" type="button">New Palette</button>
+    <button id="clear" type="button">Clear</button>
+  </div>
+</div>
+
+<div id="info">
+  <div id="hint">tap the canvas to drop a bloom · palette <span id="swatch"></span></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var swatchEl = document.getElementById("swatch");
+
+  var W = 0, H = 0, DPR = 1;
+  var particles = [];
+  var swirls = [];     // bloom swirls that locally bend the field
+  var t = 0;           // field time
+
+  // ---- curated harmonious palettes (HSL triplets/quads) ----
+  var palettes = [
+    // sunset coral
+    [[12, 88, 64], [340, 80, 66], [28, 92, 70], [300, 60, 62]],
+    // aurora
+    [[170, 72, 58], [196, 78, 62], [260, 64, 68], [142, 60, 56]],
+    // amethyst dusk
+    [[272, 70, 66], [318, 74, 70], [232, 66, 64], [206, 70, 64]],
+    // citrus garden
+    [[46, 92, 66], [88, 62, 58], [160, 66, 58], [22, 90, 66]],
+    // deep sea
+    [[210, 78, 60], [188, 74, 58], [248, 62, 66], [166, 64, 56]]
+  ];
+  var paletteIdx = Math.floor(Math.random() * palettes.length);
+
+  function currentPalette() { return palettes[paletteIdx]; }
+
+  function updateSwatch() {
+    var p = currentPalette();
+    var c = p[0];
+    swatchEl.style.background = "hsl(" + c[0] + "," + c[1] + "%," + c[2] + "%)";
+  }
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---- pseudo-noise vector field: layered sines of x, y, t ----
+  // returns an angle (radians) at world point (x, y)
+  function fieldAngle(x, y) {
+    var nx = x * 0.0021;
+    var ny = y * 0.0021;
+    var a =
+      Math.sin(nx * 1.0 + ny * 0.6 + t * 0.30) +
+      Math.sin(ny * 1.7 - nx * 0.9 + t * 0.21) * 0.8 +
+      Math.sin((nx + ny) * 1.3 + Math.cos(nx * 0.7 - t * 0.12) * 1.6) * 0.7 +
+      Math.cos(nx * 2.3 - ny * 1.1 + t * 0.16) * 0.45;
+    var ang = a * 1.35;
+
+    // swirl influence from blooms
+    for (var i = 0; i < swirls.length; i++) {
+      var s = swirls[i];
+      var dx = x - s.x;
+      var dy = y - s.y;
+      var d2 = dx * dx + dy * dy;
+      var infl = s.strength * Math.exp(-d2 / (s.radius * s.radius));
+      if (infl > 0.001) {
+        var swirlAng = Math.atan2(dy, dx) + Math.PI * 0.5;
+        // blend toward the tangential swirl angle
+        ang += Math.sin(swirlAng - ang) * infl * 3.0;
+      }
+    }
+    return ang;
+  }
+
+  // ---- particles ----
+  function makeParticle(x, y, seed) {
+    var pal = currentPalette();
+    var c = pal[(Math.random() * pal.length) | 0];
+    return {
+      x: x, y: y,
+      px: x, py: y,
+      speed: rand(0.7, 1.7),
+      life: rand(140, 380),
+      maxLife: 0,
+      hue: c[0] + rand(-12, 12),
+      sat: c[1],
+      lit: c[2] + rand(-8, 10),
+      width: rand(0.6, 2.4)
+    };
+  }
+
+  function resetParticle(p, x, y) {
+    var pal = currentPalette();
+    var c = pal[(Math.random() * pal.length) | 0];
+    p.x = x; p.y = y; p.px = x; p.py = y;
+    p.speed = rand(0.7, 1.7);
+    p.life = rand(140, 380);
+    p.maxLife = p.life;
+    p.hue = c[0] + rand(-12, 12);
+    p.sat = c[1];
+    p.lit = c[2] + rand(-8, 10);
+    p.width = rand(0.6, 2.4);
+  }
+
+  function spawnParticles() {
+    var area = W * H;
+    var target = Math.round(area / 2600);
+    target = Math.max(160, Math.min(620, target));
+    particles = [];
+    for (var i = 0; i < target; i++) {
+      var p = makeParticle(Math.random() * W, Math.random() * H);
+      p.maxLife = p.life;
+      p.life = Math.random() * p.maxLife; // stagger
+      particles.push(p);
+    }
+  }
+
+  // ---- layout / resize ----
+  function paintBackground() {
+    var g = ctx.createRadialGradient(W * 0.5, H * 0.5, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.75);
+    g.addColorStop(0, "#15101c");
+    g.addColorStop(1, "#080610");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    var newW = Math.max(1, rect.width);
+    var newH = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    // preserve the artwork across resizes when possible
+    var snap = null;
+    if (W > 0 && H > 0 && canvas.width > 0) {
+      try { snap = ctx.getImageData(0, 0, canvas.width, canvas.height); } catch (e) { snap = null; }
+    }
+
+    W = newW; H = newH;
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (snap) {
+      ctx.putImageData(snap, 0, 0);
+    } else {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      paintBackground();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  function clearArt() {
+    paintBackground();
+    for (var i = 0; i < particles.length; i++) {
+      resetParticle(particles[i], Math.random() * W, Math.random() * H);
+      particles[i].life = Math.random() * particles[i].maxLife;
+    }
+  }
+
+  // ---- bloom ----
+  function bloom(x, y) {
+    swirls.push({
+      x: x, y: y,
+      radius: Math.min(W, H) * rand(0.16, 0.26),
+      strength: rand(0.7, 1.0),
+      decay: rand(0.004, 0.008)
+    });
+    if (swirls.length > 6) swirls.shift();
+
+    var burst = 70;
+    for (var i = 0; i < burst; i++) {
+      var ang = (i / burst) * Math.PI * 2 + rand(-0.2, 0.2);
+      var r = rand(0, Math.min(W, H) * 0.06);
+      var p;
+      if (particles.length > 0 && i % 2 === 0) {
+        // recycle some existing particles into the burst
+        p = particles[(Math.random() * particles.length) | 0];
+        resetParticle(p, x + Math.cos(ang) * r, y + Math.sin(ang) * r);
+      } else {
+        p = makeParticle(x + Math.cos(ang) * r, y + Math.sin(ang) * r);
+        p.maxLife = p.life;
+        particles.push(p);
+      }
+      p.speed = rand(1.3, 2.6);
+    }
+    // cap total particles
+    var cap = 700;
+    if (particles.length > cap) particles.splice(0, particles.length - cap);
+
+    // visible flash ring
+    var fg = ctx.createRadialGradient(x, y, 0, x, y, Math.min(W, H) * 0.14);
+    var c = currentPalette()[0];
+    fg.addColorStop(0, "hsla(" + c[0] + "," + c[1] + "%,80%,0.45)");
+    fg.addColorStop(1, "hsla(" + c[0] + "," + c[1] + "%,80%,0)");
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.arc(x, y, Math.min(W, H) * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- step + draw ----
+  function frame() {
+    t += 0.016;
+
+    // gentle breathing fade so the canvas never fully saturates
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(8, 6, 16, 0.012)";
+    ctx.fillRect(0, 0, W, H);
+
+    // decay swirls
+    for (var s = swirls.length - 1; s >= 0; s--) {
+      swirls[s].strength -= swirls[s].decay;
+      if (swirls[s].strength <= 0) swirls.splice(s, 1);
+    }
+
+    // draw particle strokes additively for glow
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "round";
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      var ang = fieldAngle(p.x, p.y);
+      p.px = p.x;
+      p.py = p.y;
+      p.x += Math.cos(ang) * p.speed;
+      p.y += Math.sin(ang) * p.speed;
+      p.life--;
+
+      var lifeFrac = p.maxLife > 0 ? p.life / p.maxLife : 0;
+      // fade in at birth, fade out at death
+      var alpha = Math.min(1, lifeFrac * 4) * Math.min(1, (1 - lifeFrac) * 4 + 0.15);
+
+      // wrap / respawn
+      var out = (p.x < -10 || p.x > W + 10 || p.y < -10 || p.y > H + 10);
+      if (p.life <= 0 || out) {
+        resetParticle(p, Math.random() * W, Math.random() * H);
+        continue;
+      }
+
+      ctx.strokeStyle = "hsla(" + p.hue + "," + p.sat + "%," + p.lit + "%," + (alpha * 0.34).toFixed(3) + ")";
+      ctx.lineWidth = p.width;
+      ctx.beginPath();
+      ctx.moveTo(p.px, p.py);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---- input ----
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  var dragging = false;
+  var dragId = null;
+  var lastDropTime = 0;
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    dragging = true;
+    dragId = e.pointerId;
+    bloom(pt.x, pt.y);
+    lastDropTime = performance.now();
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging || e.pointerId !== dragId) return;
+    e.preventDefault();
+    var now = performance.now();
+    if (now - lastDropTime > 110) {
+      var pt = pointFromEvent(e);
+      bloom(pt.x, pt.y);
+      lastDropTime = now;
+    }
+  });
+
+  function endDrag(e) {
+    if (e.pointerId !== dragId) return;
+    dragging = false;
+    dragId = null;
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  // ---- buttons ----
+  document.getElementById("palette").addEventListener("click", function () {
+    paletteIdx = (paletteIdx + 1) % palettes.length;
+    updateSwatch();
+    // gently migrate existing particles to the new palette as they respawn
+    for (var i = 0; i < particles.length; i++) {
+      if (Math.random() < 0.5) {
+        particles[i].life = Math.random() * 30;
+      }
+    }
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    swirls = [];
+    clearArt();
+  });
+
+  // ---- boot ----
+  window.addEventListener("resize", function () {
+    resize();
+  });
+
+  resize();
+  updateSwatch();
+  spawnParticles();
+  // a couple of gentle starting blooms so the canvas opens alive
+  requestAnimationFrame(function () {
+    bloom(W * 0.34, H * 0.42);
+    bloom(W * 0.66, H * 0.58);
+    stage.classList.add("ready");
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>

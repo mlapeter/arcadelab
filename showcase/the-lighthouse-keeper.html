@@ -1,0 +1,681 @@
+<!--ARCADELAB
+title: The Lighthouse Keeper
+description: An atmospheric branching story — keep the light burning through a storm, make choices that matter, and reach one of three endings.
+emoji: 🗼
+color: orange
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Lighthouse Keeper</title>
+<style>
+  :root{
+    --bg:#0c0a09;
+    --bg-2:#15110d;
+    --ink:#ece3d4;
+    --muted:#9a8f7c;
+    --amber:#e8932f;
+    --amber-soft:#f0b566;
+    --line:#2c241b;
+    --card:#171310;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    height:100%;
+    background:var(--bg);
+  }
+  body{
+    color:var(--ink);
+    font-family:Georgia,"Iowan Old Style","Times New Roman",serif;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* atmospheric backdrop */
+  #scene{
+    position:fixed;
+    inset:0;
+    overflow:hidden;
+    z-index:0;
+    background:
+      radial-gradient(120% 80% at 50% 8%, rgba(232,147,47,0.10), transparent 60%),
+      linear-gradient(180deg,#120f0c 0%,#0c0a09 55%,#08070a 100%);
+  }
+  #scene canvas{position:absolute;inset:0;width:100%;height:100%;}
+  #wrap{
+    position:relative;
+    z-index:1;
+    height:100%;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  #col{
+    width:100%;
+    max-width:620px;
+    padding:clamp(26px,7vw,64px) clamp(20px,6vw,40px) 80px;
+  }
+  header.mast{
+    text-align:center;
+    margin-bottom:30px;
+  }
+  .mast .glyph{
+    font-size:clamp(34px,9vw,46px);
+    line-height:1;
+    filter:drop-shadow(0 0 14px rgba(232,147,47,0.55));
+  }
+  .mast h1{
+    font-size:clamp(22px,5vw,30px);
+    letter-spacing:.5px;
+    margin:10px 0 4px;
+    font-weight:600;
+  }
+  .mast .sub{
+    font-size:13px;
+    letter-spacing:2.4px;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-family:system-ui,-apple-system,sans-serif;
+    margin:0;
+  }
+  .rule{
+    width:54px;
+    height:1px;
+    background:linear-gradient(90deg,transparent,var(--amber),transparent);
+    margin:16px auto 0;
+  }
+  #passage{
+    transition:opacity .42s ease, transform .42s ease;
+  }
+  #passage.fading{
+    opacity:0;
+    transform:translateY(10px);
+  }
+  .ptitle{
+    font-size:clamp(18px,4.4vw,23px);
+    color:var(--amber-soft);
+    font-weight:600;
+    margin:0 0 16px;
+    letter-spacing:.3px;
+  }
+  .ptext p{
+    font-size:clamp(16px,2.5vw,18px);
+    line-height:1.72;
+    margin:0 0 16px;
+    color:var(--ink);
+  }
+  .ptext p:first-letter{}
+  .ptext em{color:var(--amber-soft);font-style:italic;}
+  .status{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:6px 0 22px;
+    min-height:4px;
+  }
+  .tag{
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:11.5px;
+    letter-spacing:.4px;
+    color:var(--amber-soft);
+    border:1px solid var(--line);
+    background:rgba(232,147,47,0.07);
+    padding:4px 10px;
+    border-radius:999px;
+  }
+  .choices{
+    display:flex;
+    flex-direction:column;
+    gap:11px;
+    margin-top:8px;
+  }
+  .choice{
+    appearance:none;
+    -webkit-appearance:none;
+    text-align:left;
+    font-family:Georgia,serif;
+    font-size:clamp(15px,2.4vw,16.5px);
+    color:var(--ink);
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:15px 17px;
+    cursor:pointer;
+    line-height:1.5;
+    transition:border-color .18s ease, background .18s ease, transform .12s ease;
+    position:relative;
+  }
+  .choice:hover{
+    border-color:var(--amber);
+    background:#1d1711;
+  }
+  .choice:active{transform:scale(0.99);}
+  .choice:focus-visible{outline:2px solid var(--amber);outline-offset:2px;}
+  .choice .arrow{
+    color:var(--amber);
+    margin-right:9px;
+    font-family:system-ui,sans-serif;
+  }
+  .ending-label{
+    font-family:system-ui,-apple-system,sans-serif;
+    text-transform:uppercase;
+    letter-spacing:3px;
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+    margin:6px 0 14px;
+  }
+  .restart{
+    margin-top:12px;
+    align-self:center;
+    appearance:none;
+    -webkit-appearance:none;
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:14px;
+    letter-spacing:.5px;
+    color:#0c0a09;
+    background:linear-gradient(180deg,var(--amber-soft),var(--amber));
+    border:none;
+    border-radius:12px;
+    padding:13px 26px;
+    cursor:pointer;
+    box-shadow:0 6px 22px rgba(232,147,47,0.32);
+    transition:transform .12s ease, box-shadow .18s ease;
+  }
+  .restart:hover{transform:translateY(-1px);box-shadow:0 9px 26px rgba(232,147,47,0.42);}
+  .restart:active{transform:translateY(0);}
+  .footnote{
+    text-align:center;
+    color:var(--muted);
+    font-family:system-ui,-apple-system,sans-serif;
+    font-size:12px;
+    margin-top:34px;
+  }
+  ::-webkit-scrollbar{width:9px;}
+  ::-webkit-scrollbar-thumb{background:#2c241b;border-radius:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+<div id="scene"><canvas id="fx"></canvas></div>
+<div id="wrap">
+  <div id="col">
+    <header class="mast">
+      <div class="glyph">🗼</div>
+      <h1>The Lighthouse Keeper</h1>
+      <p class="sub">A Story of One Stormy Night</p>
+      <div class="rule"></div>
+    </header>
+    <div id="passage"></div>
+    <p class="footnote">An interactive tale · choose carefully</p>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- atmospheric rain + light sweep on canvas ---------- */
+  var canvas = document.getElementById("fx");
+  var ctx = canvas.getContext("2d");
+  var W=0,H=0,DPR=1;
+  var drops=[];
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio||1,2);
+    var cw = window.innerWidth, ch = window.innerHeight;
+    canvas.width = Math.round(cw*DPR);
+    canvas.height = Math.round(ch*DPR);
+    canvas.style.width = cw+"px";
+    canvas.style.height = ch+"px";
+    W=cw; H=ch;
+    if(ctx) ctx.setTransform(DPR,0,0,DPR,0,0);
+    var target = Math.round((W*H)/14000);
+    while(drops.length < target) drops.push(newDrop(true));
+    if(drops.length > target) drops.length = target;
+  }
+
+  function newDrop(anywhere){
+    return {
+      x: Math.random()*W,
+      y: anywhere ? Math.random()*H : -20,
+      len: 9 + Math.random()*15,
+      spd: 320 + Math.random()*340,
+      drift: 26 + Math.random()*30,
+      a: 0.07 + Math.random()*0.14
+    };
+  }
+
+  var lastT=0, sweep=0;
+  function tick(t){
+    if(!lastT) lastT=t;
+    var dt = Math.min(0.05,(t-lastT)/1000);
+    lastT=t;
+    if(!ctx){ return; }
+
+    ctx.clearRect(0,0,W,H);
+
+    // slow rotating beam from the top centre
+    sweep += dt*0.55;
+    var bx = W*0.5, by = H*0.05;
+    var ang = Math.sin(sweep)*0.9 - Math.PI/2;
+    var beamLen = Math.max(W,H)*1.1;
+    var ex = bx + Math.cos(ang)*beamLen;
+    var ey = by + Math.sin(ang)*beamLen;
+    var grad = ctx.createLinearGradient(bx,by,ex,ey);
+    grad.addColorStop(0,"rgba(240,181,102,0.16)");
+    grad.addColorStop(1,"rgba(240,181,102,0)");
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(bx,by);
+    var spread = 0.16;
+    ctx.lineTo(bx+Math.cos(ang-spread)*beamLen, by+Math.sin(ang-spread)*beamLen);
+    ctx.lineTo(bx+Math.cos(ang+spread)*beamLen, by+Math.sin(ang+spread)*beamLen);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    // rain
+    ctx.lineWidth = 1.1;
+    for(var i=0;i<drops.length;i++){
+      var d = drops[i];
+      d.y += d.spd*dt;
+      d.x += d.drift*dt;
+      if(d.y > H+20 || d.x > W+20){
+        drops[i] = newDrop(false);
+        continue;
+      }
+      ctx.strokeStyle = "rgba(190,200,220,"+d.a+")";
+      ctx.beginPath();
+      ctx.moveTo(d.x,d.y);
+      ctx.lineTo(d.x - d.drift*0.03, d.y - d.len);
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(tick);
+
+  /* ---------- story data ---------- */
+  // state flags: lamp (lit the lamp), hasKnife, hasKey, sawShip, helpedSailor
+  var story = {
+
+    start:{
+      title:"The Climb",
+      text:[
+        "Wind hammers the windows of Gull Rock Light, and the sea below is a black, heaving thing. You are the keeper here — have been for nine quiet years — and tonight is not quiet.",
+        "The lamp room is sixty iron steps above you. Below, in the supply cellar, the storm shutters bang loose. And on the table beside you: a cold cup of tea, a brass key, and your father's old <em>fishing knife</em>.",
+        "Somewhere out in the dark, a bell is ringing that should not be ringing."
+      ],
+      choices:[
+        {label:"Climb straight to the lamp room. The light comes first.", to:"lampUnlit"},
+        {label:"Pocket the knife, then go down to the cellar.", to:"cellar", set:{hasKnife:true}},
+        {label:"Stand at the window and listen to that bell.", to:"window"}
+      ]
+    },
+
+    window:{
+      title:"The Bell in the Dark",
+      text:[
+        "You press your forehead to the cold glass. The bell comes again — not the harbour bell, too high, too frantic. A ship's bell, rung by a desperate hand.",
+        "Out past the reef you catch it: the pale shape of a sloop, mast tilted, sliding sideways toward the rocks. They have no light to steer by. <em>Your</em> light is dark.",
+        "Your stomach drops. You have been standing here too long."
+      ],
+      choices:[
+        {label:"Run for the lamp room now.", to:"lampUnlit", set:{sawShip:true}},
+        {label:"Take the knife and rope from the cellar first — they may need rescue.", to:"cellar", set:{sawShip:true,hasKnife:true}}
+      ]
+    },
+
+    cellar:{
+      title:"The Cellar",
+      text:[
+        "You descend into the smell of salt, tar, and old rope. The loose shutter slams the wall like a drum. Lantern light swings wild shadows across crates of oil and coiled line.",
+        "There is the spare oil you will need for the lamp — and, half-buried under a tarp, the locked sea-chest your predecessor left behind. You never found the time, or the nerve, to open it.",
+        "The shutter bangs again. Every second the lamp stays dark, the sea grows bolder."
+      ],
+      choices:[
+        {label:"Grab a can of oil and hurry to the lamp room.", to:"lampUnlit", set:{hasOil:true}},
+        {label:"Try the brass key in the old sea-chest.", to:"chest", cond:function(s){return true;}},
+        {label:"Fix the banging shutter — you cannot think with that noise.", to:"shutter"}
+      ]
+    },
+
+    chest:{
+      title:"The Sea-Chest",
+      text:[
+        "The brass key turns with a reluctant groan. Inside, wrapped in oilcloth, is a keeper's logbook — and a heavy storm-glass lantern, the kind built to burn in any wind.",
+        "The last entry in the log is dated forty years ago. It reads only: <em>\"When the sea asks for a life, give it light instead. It has always been enough.\"</em>",
+        "You take the storm lantern. It feels, somehow, like a promise."
+      ],
+      choices:[
+        {label:"Carry the storm lantern up to the lamp room.", to:"lampUnlit", set:{hasStormLantern:true,hasOil:true}},
+        {label:"Read the rest of the log by lantern-light first.", to:"logbook", set:{hasStormLantern:true,hasOil:true}}
+      ]
+    },
+
+    logbook:{
+      title:"The Keeper's Log",
+      text:[
+        "Page after page of weather, of ships passed safely, of long ordinary nights. And then, near the end, a hand grown shaky:",
+        "<em>\"The light is not the glass nor the flame. The light is the keeper deciding, again and again, to climb the stairs.\"</em>",
+        "You close the book. Far above, the wind is screaming for the lamp."
+      ],
+      choices:[
+        {label:"Climb. Decide, again, to climb.", to:"lampUnlit", set:{readLog:true}}
+      ]
+    },
+
+    shutter:{
+      title:"The Loose Shutter",
+      text:[
+        "You wrestle the shutter against the gale and drop the iron bar into its bracket. Sudden, blessed stillness — only the wind outside now, kept out where it belongs.",
+        "In the quiet you hear your own heartbeat, and beneath it, faint and far: that frantic bell again. A ship. You have spent precious minutes on a piece of wood.",
+        "Oil can in hand, you turn for the stairs."
+      ],
+      choices:[
+        {label:"Climb to the lamp room — fast.", to:"lampUnlit", set:{hasOil:true}}
+      ]
+    },
+
+    lampUnlit:{
+      title:"The Dark Lamp",
+      text:[
+        "Sixty steps, taken two at a time, and you burst into the lamp room. The great lens waits, cold and patient, ringed by glass and brass.",
+        "The wick is dry. Without oil it will catch for a moment and gutter out — and the storm will have its way with whatever waits beyond the reef.",
+        function(s){
+          return s.hasOil
+            ? "But you brought oil. Your hands are already moving, steady despite everything."
+            : "And you brought <em>no oil</em>. The cellar is sixty steps down, and down again is time you may not have.";
+        }
+      ],
+      choices:[
+        {label:"Fill the wick and strike the light.", to:"lit", cond:function(s){return s.hasOil;}},
+        {label:"Light the dry wick anyway and pray it holds.", to:"gutterRisk", cond:function(s){return !s.hasOil;}},
+        {label:"Race back down for oil while the ship still floats.", to:"oilRace", cond:function(s){return !s.hasOil;}}
+      ]
+    },
+
+    oilRace:{
+      title:"The Race",
+      text:[
+        "Down, down, your boots ringing on iron, lungs burning. You snatch a can from the cellar and climb again — and the climb back is the longest of your life.",
+        "When you reach the lamp room your arms shake too hard to pour cleanly, but you pour. Oil, wick, the scratch of a match."
+      ],
+      choices:[
+        {label:"Strike the light.", to:"lit", set:{hasOil:true}}
+      ]
+    },
+
+    gutterRisk:{
+      title:"A Flame Without Oil",
+      text:[
+        "The dry wick catches in a bright, hungry flash — and the great lens throws a single magnificent beam across the water. For one heartbeat the whole storm is lit gold.",
+        "Then the flame, with nothing to feed it, shrinks. Wavers. <em>Gutters out.</em>",
+        "Darkness rushes back into the lamp room like water into a sinking hull."
+      ],
+      choices:[
+        {label:"Stand in the dark and listen.", to:"endDark"}
+      ]
+    },
+
+    lit:{
+      title:"The Light",
+      text:[
+        "The match flares. The wick takes the flame and holds it, and you ease the great lens around until the beam swings out — strong, steady, gold against the black.",
+        "Far below, the tilted sloop seems to pause in its slide toward the rocks. Then, slowly, its bow comes around. They have <em>seen</em> you. They are steering by your light.",
+        function(s){
+          return s.hasStormLantern
+            ? "The storm lantern sits ready at your feet. There is still the matter of the reef itself — and a crew who may not make the harbour without a hand on the rocks."
+            : "But the harbour mouth is narrow and the reef is cruel, and a light alone may not be enough to thread them through.";
+        }
+      ],
+      choices:[
+        {label:"Stay with the lamp. Keep the beam true until dawn.", to:"endKeeper", set:{lamp:true}},
+        {label:"Take the storm lantern down to the rocks and guide them in by hand.", to:"rocks", cond:function(s){return s.hasStormLantern;}, set:{lamp:true}},
+        {label:"Grab any lantern and run for the rocks — light alone is not enough.", to:"rocksHard", cond:function(s){return !s.hasStormLantern;}, set:{lamp:true}}
+      ]
+    },
+
+    rocksHard:{
+      title:"Down to the Rocks",
+      text:[
+        "You take the ordinary cellar lantern and fight your way down the cliff path. Rain blinds you; the wind tries to peel you off the stone.",
+        "At the water's edge you raise the lantern high — and a gust snuffs it like a candle. You are a shadow among shadows now, shouting into a storm that swallows every word.",
+        "Out on the water, the sloop wavers, uncertain, with only the far lamp to trust."
+      ],
+      choices:[
+        {label:"Wave your arms and trust the great lamp to do the rest.", to:"endKeeper"},
+        {label:"Wade out onto the reef itself and risk everything.", to:"reefRisk"}
+      ]
+    },
+
+    reefRisk:{
+      title:"Onto the Reef",
+      text:[
+        "You climb out across the wet black teeth of the reef, the sea clawing at your knees. You have no light, only your voice and your two raised hands.",
+        function(s){
+          return s.hasKnife
+            ? "When the sloop scrapes the rocks you are there — and your father's knife cuts the fouled mooring line in one stroke, freeing the hull before the sea can break it."
+            : "When the sloop scrapes the rocks a line fouls fast around the reef, and you have nothing to cut it with. You haul at the wet rope with bleeding hands as the waves rise.";
+        }
+      ],
+      choices:[
+        {label:"See it through.", to:"reefResolve"}
+      ]
+    },
+
+    reefResolve:{
+      title:null,
+      text:[
+        function(s){
+          return s.hasKnife
+            ? "The freed sloop slips off the rocks and rides the swell into calmer water. Hands reach down and pull you, soaked and laughing and weeping, over the gunwale."
+            : "The rope will not give. The sea takes the sloop sideways — but it takes you first, and the cold is very quick, and very quiet.";
+        }
+      ],
+      choices:[
+        {label:"continue", to:function(s){ return s.hasKnife ? "endRescuer" : "endLost"; }}
+      ]
+    },
+
+    rocks:{
+      title:"Down to the Rocks",
+      text:[
+        "Storm lantern blazing, you descend the cliff path. The wind throws everything it has at the flame — and the storm-glass holds it, a small fierce sun in your fist.",
+        "At the reef's edge you swing the lantern in slow, deliberate arcs: <em>here, here, the channel runs here.</em> A pale face at the sloop's bow lifts toward you.",
+        function(s){
+          return s.hasKnife
+            ? "They turn into the channel. As the hull glides past, a mooring line whips loose and snags the rocks — but your knife is already out, and it parts the rope clean."
+            : "They turn into the channel. A loose line snags the rocks and the hull jerks hard — and you have nothing but your hands to fight the knot.";
+        }
+      ],
+      choices:[
+        {label:"Hold the light steady and bring them home.", to:"rocksResolve"}
+      ]
+    },
+
+    rocksResolve:{
+      title:null,
+      text:[
+        function(s){
+          return s.hasKnife
+            ? "Freed and steered true, the sloop slides through the reef and into the harbour's dark calm. Five sailors stagger onto the dock and one of them simply holds you, saying nothing, for a long time."
+            : "You haul at the snagged line until your palms tear, and slowly — slowly — the rope works loose. The sloop limps into the harbour. It is a near thing, the nearest of things, but they are alive.";
+        }
+      ],
+      choices:[
+        {label:"continue", to:"endRescuer"}
+      ]
+    },
+
+    /* ---------- endings ---------- */
+    endKeeper:{
+      title:"Dawn",
+      ending:"Ending · The Keeper",
+      text:[
+        "You stay with the lamp. All night you turn the great lens by hand when the mechanism strains, and the beam never falters — gold and patient and true.",
+        "By grey morning the storm has spent itself. Out past the reef the little sloop rides at anchor, battered but whole, saved by nothing more and nothing less than a light that refused to go out.",
+        "You did the oldest work there is. You climbed the stairs, and you kept the light. <em>It has always been enough.</em>"
+      ]
+    },
+
+    endRescuer:{
+      title:"The Lifeboat Keeper",
+      ending:"Ending · The Rescuer",
+      text:[
+        "They will tell this story in the village for years: the keeper who lit the lamp <em>and then went down to the water</em>, who pulled a whole crew off Gull Rock with a lantern and a steady nerve.",
+        "You will wave the praise away every time. But on the worst nights, when the bell rings out of the dark, the village will sleep a little easier — because they know who is awake in the tower.",
+        "The light saved them. So did the keeper who would not only watch."
+      ]
+    },
+
+    endLost:{
+      title:"What the Sea Asked",
+      ending:"Ending · The Sea's Price",
+      text:[
+        "You went out onto the reef with courage and bare hands, and the sea — which respects courage but is not ruled by it — asked of you the oldest price of all.",
+        "The sloop's crew survived to tell how a keeper waded into the dark to reach them. They will light a lamp for you every stormy night hereafter.",
+        "<em>When the sea asks for a life, give it light instead.</em> Tonight, with no blade to cut the rope, there was only the harder gift to give."
+      ]
+    },
+
+    endDark:{
+      title:"The Night the Light Failed",
+      ending:"Ending · The Dark Tower",
+      text:[
+        "The lamp room is black. Below, the bell rings on, and on, and then — terribly — it stops.",
+        "By morning the tide leaves its wreckage along the shingle: pale timber, a coil of rope, a child's wooden gull. The reef has kept what the light could not turn away.",
+        "A lighthouse is only a building. The light was always the keeper, climbing the stairs in time, remembering the oil. Tonight, the tower stood dark — and the sea remembered everything."
+      ]
+    }
+  };
+
+  /* ---------- engine ---------- */
+  var state = {};
+  var passageEl = document.getElementById("passage");
+  var wrap = document.getElementById("wrap");
+
+  function resolveText(t){
+    return (typeof t === "function") ? t(state) : t;
+  }
+
+  function render(id){
+    var node = story[id];
+    if(!node){ return; }
+
+    var isEnding = !!node.ending;
+    var html = "";
+
+    if(isEnding){
+      html += '<div class="ending-label">'+escapeHtml(node.ending)+'</div>';
+    }
+    if(node.title){
+      html += '<h2 class="ptitle">'+escapeHtml(node.title)+'</h2>';
+    }
+    html += '<div class="ptext">';
+    for(var i=0;i<node.text.length;i++){
+      html += '<p>'+resolveText(node.text[i])+'</p>';
+    }
+    html += '</div>';
+
+    // status tags
+    var tags = [];
+    if(state.hasKnife) tags.push("🔪 Father's knife");
+    if(state.hasStormLantern) tags.push("🏮 Storm lantern");
+    if(state.hasOil) tags.push("🛢️ Oil");
+    if(state.lamp) tags.push("🔥 The lamp is lit");
+    if(tags.length && !isEnding){
+      html += '<div class="status">';
+      for(var k=0;k<tags.length;k++){
+        html += '<span class="tag">'+escapeHtml(tags[k])+'</span>';
+      }
+      html += '</div>';
+    }
+
+    if(isEnding){
+      html += '<button class="restart" type="button" id="restartBtn">↺ Begin the night again</button>';
+    } else {
+      html += '<div class="choices">';
+      var choices = node.choices || [];
+      var shown = 0;
+      for(var c=0;c<choices.length;c++){
+        var ch = choices[c];
+        if(ch.cond && !ch.cond(state)) continue;
+        html += '<button class="choice" type="button" data-idx="'+c+'">'+
+                '<span class="arrow">▸</span>'+escapeHtml(ch.label)+'</button>';
+        shown++;
+      }
+      html += '</div>';
+    }
+
+    passageEl.innerHTML = html;
+
+    // wire up
+    if(isEnding){
+      var rb = document.getElementById("restartBtn");
+      if(rb) rb.addEventListener("click", function(){ go("start", true); });
+    } else {
+      var btns = passageEl.querySelectorAll(".choice");
+      for(var b=0;b<btns.length;b++){
+        btns[b].addEventListener("click", function(){
+          var idx = parseInt(this.getAttribute("data-idx"),10);
+          var choice = story[currentId].choices[idx];
+          if(choice.set){
+            for(var key in choice.set){
+              if(Object.prototype.hasOwnProperty.call(choice.set,key)){
+                state[key] = choice.set[key];
+              }
+            }
+          }
+          var dest = (typeof choice.to === "function") ? choice.to(state) : choice.to;
+          go(dest, false);
+        });
+      }
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  var currentId = "start";
+  var transitioning = false;
+
+  function go(id, reset){
+    if(transitioning) return;
+    transitioning = true;
+    if(reset) state = {};
+    passageEl.classList.add("fading");
+    setTimeout(function(){
+      currentId = id;
+      render(id);
+      wrap.scrollTop = 0;
+      // force reflow then fade in
+      void passageEl.offsetWidth;
+      passageEl.classList.remove("fading");
+      transitioning = false;
+    }, 430);
+  }
+
+  // initial paint (no fade-out, just fade-in)
+  passageEl.classList.add("fading");
+  render("start");
+  void passageEl.offsetWidth;
+  requestAnimationFrame(function(){
+    passageEl.classList.remove("fading");
+  });
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,446 @@
+<!--ARCADELAB
+title: Boids Flock
+description: A live boids flocking simulation — tune separation, alignment, and cohesion, then scatter the flock with a tap.
+emoji: 🐦
+color: teal
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Boids Flock</title>
+<style>
+  :root {
+    --bg: #06121a;
+    --panel: rgba(8, 28, 38, 0.82);
+    --line: rgba(74, 222, 222, 0.22);
+    --teal: #38e1d4;
+    --teal-soft: #7ff0e7;
+    --text: #d6f3f1;
+    --muted: #6f9c9c;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage {
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(900px 600px at 70% 20%, rgba(56, 225, 212, 0.10), transparent 60%),
+      radial-gradient(700px 500px at 15% 95%, rgba(56, 225, 212, 0.07), transparent 60%),
+      var(--bg);
+  }
+  #c { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 14px 16px 0;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    animation: fade 0.7s ease both;
+  }
+  #title h1 {
+    margin: 0;
+    font-size: clamp(17px, 2.4vw, 22px);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+  }
+  #title p {
+    margin: 3px 0 0;
+    font-size: clamp(12px, 1.6vw, 13.5px);
+    color: var(--muted);
+    max-width: 60vw;
+  }
+  #count {
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(12px, 1.6vw, 13.5px);
+    color: var(--teal-soft);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 7px 11px;
+    white-space: nowrap;
+    align-self: flex-start;
+  }
+
+  #panel {
+    position: fixed;
+    left: 50%;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(520px, calc(100vw - 24px));
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 14px 16px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+    animation: rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 9px 0;
+  }
+  .row label {
+    flex: 0 0 84px;
+    font-size: 13px;
+    color: var(--teal-soft);
+  }
+  .row .val {
+    flex: 0 0 34px;
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  input[type=range] {
+    flex: 1 1 auto;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--teal), rgba(56, 225, 212, 0.18));
+    outline: none;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #eafffd;
+    border: 3px solid var(--teal);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #eafffd;
+    border: 3px solid var(--teal);
+    cursor: pointer;
+  }
+  #panel .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  #panel .tip {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  button {
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: #06121a;
+    background: linear-gradient(180deg, var(--teal-soft), var(--teal));
+    border: none;
+    border-radius: 12px;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: transform 0.12s ease, filter 0.12s ease;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(0.95); }
+
+  @keyframes rise { from { opacity: 0; transform: translateX(-50%) translateY(16px); } }
+  @keyframes fade { from { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div id="title">
+    <h1>🐦 Boids Flock</h1>
+    <p>Tune the three rules below. Tap the sky to scatter the flock.</p>
+  </div>
+  <div id="count">— boids</div>
+</div>
+
+<div id="panel">
+  <div class="row">
+    <label for="sep">Separation</label>
+    <input type="range" id="sep" min="0" max="200" value="100">
+    <span class="val" id="sepv">1.0</span>
+  </div>
+  <div class="row">
+    <label for="ali">Alignment</label>
+    <input type="range" id="ali" min="0" max="200" value="100">
+    <span class="val" id="aliv">1.0</span>
+  </div>
+  <div class="row">
+    <label for="coh">Cohesion</label>
+    <input type="range" id="coh" min="0" max="200" value="100">
+    <span class="val" id="cohv">1.0</span>
+  </div>
+  <div class="foot">
+    <span class="tip">Triangles point where they fly · hue maps to speed</span>
+    <button id="reset">Reset</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("c");
+  var ctx = canvas ? canvas.getContext("2d") : null;
+  if (!ctx) return;
+
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W = 1, H = 1;
+
+  function resize() {
+    var r = canvas.getBoundingClientRect();
+    W = Math.max(1, r.width);
+    H = Math.max(1, r.height);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+
+  // ----- simulation params -----
+  var sepEl = document.getElementById("sep");
+  var aliEl = document.getElementById("ali");
+  var cohEl = document.getElementById("coh");
+  var sepv = document.getElementById("sepv");
+  var aliv = document.getElementById("aliv");
+  var cohv = document.getElementById("cohv");
+  var countEl = document.getElementById("count");
+
+  var params = { sep: 1, ali: 1, coh: 1 };
+
+  function syncParams() {
+    params.sep = (+sepEl.value) / 100;
+    params.ali = (+aliEl.value) / 100;
+    params.coh = (+cohEl.value) / 100;
+    sepv.textContent = params.sep.toFixed(1);
+    aliv.textContent = params.ali.toFixed(1);
+    cohv.textContent = params.coh.toFixed(1);
+  }
+  sepEl.addEventListener("input", syncParams);
+  aliEl.addEventListener("input", syncParams);
+  cohEl.addEventListener("input", syncParams);
+  syncParams();
+
+  // tuning constants
+  var PERCEPTION = 56;       // neighbour radius for align/cohesion
+  var SEP_RADIUS = 26;       // close-range avoidance radius
+  var MAX_SPEED = 2.7;
+  var MIN_SPEED = 1.3;
+  var MAX_FORCE = 0.06;
+  var SCARE_RADIUS = 130;
+  var SCARE_FORCE = 0.9;
+
+  var boids = [];
+  var BOID_COUNT = 200;
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function makeBoid() {
+    var a = rand(0, Math.PI * 2);
+    var s = rand(MIN_SPEED, MAX_SPEED);
+    return {
+      x: rand(0, W || 800),
+      y: rand(0, H || 600),
+      vx: Math.cos(a) * s,
+      vy: Math.sin(a) * s,
+      hue: 175
+    };
+  }
+
+  function initBoids() {
+    boids.length = 0;
+    for (var i = 0; i < BOID_COUNT; i++) boids.push(makeBoid());
+  }
+
+  // ----- pointer scatter -----
+  var scare = { active: false, x: 0, y: 0 };
+
+  function pointerPos(e) {
+    var r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var p = pointerPos(e);
+    scare.active = true; scare.x = p.x; scare.y = p.y;
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (!scare.active) return;
+    e.preventDefault();
+    var p = pointerPos(e);
+    scare.x = p.x; scare.y = p.y;
+  });
+  function endScare() { scare.active = false; }
+  canvas.addEventListener("pointerup", endScare);
+  canvas.addEventListener("pointercancel", endScare);
+  canvas.addEventListener("pointerleave", endScare);
+
+  document.getElementById("reset").addEventListener("click", function () {
+    sepEl.value = 100; aliEl.value = 100; cohEl.value = 100;
+    syncParams();
+    initBoids();
+  });
+
+  function limit(x, y, max) {
+    var m = Math.sqrt(x * x + y * y);
+    if (m > max && m > 0) { var k = max / m; return [x * k, y * k]; }
+    return [x, y];
+  }
+
+  function step() {
+    var n = boids.length;
+    for (var i = 0; i < n; i++) {
+      var b = boids[i];
+      var sx = 0, sy = 0;            // separation
+      var ax = 0, ay = 0, ac = 0;   // alignment accumulators
+      var cx = 0, cy = 0, cc = 0;   // cohesion accumulators
+
+      for (var j = 0; j < n; j++) {
+        if (j === i) continue;
+        var o = boids[j];
+        var dx = b.x - o.x, dy = b.y - o.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 > PERCEPTION * PERCEPTION || d2 === 0) continue;
+        var d = Math.sqrt(d2);
+        if (d < SEP_RADIUS) {
+          sx += dx / d / d;
+          sy += dy / d / d;
+        }
+        ax += o.vx; ay += o.vy; ac++;
+        cx += o.x; cy += o.y; cc++;
+      }
+
+      var fx = 0, fy = 0, s;
+
+      // separation
+      if (sx !== 0 || sy !== 0) {
+        s = limit(sx, sy, MAX_SPEED);
+        s = limit(s[0] * 60 - b.vx, s[1] * 60 - b.vy, MAX_FORCE);
+        fx += s[0] * 1.6 * params.sep;
+        fy += s[1] * 1.6 * params.sep;
+      }
+      // alignment
+      if (ac > 0) {
+        s = limit(ax / ac - b.vx, ay / ac - b.vy, MAX_FORCE);
+        fx += s[0] * params.ali;
+        fy += s[1] * params.ali;
+      }
+      // cohesion
+      if (cc > 0) {
+        s = limit((cx / cc - b.x) * 0.045 - b.vx, (cy / cc - b.y) * 0.045 - b.vy, MAX_FORCE);
+        fx += s[0] * params.coh;
+        fy += s[1] * params.coh;
+      }
+      // scatter from pointer
+      if (scare.active) {
+        var px = b.x - scare.x, py = b.y - scare.y;
+        var pd = Math.sqrt(px * px + py * py);
+        if (pd < SCARE_RADIUS && pd > 0) {
+          var pw = (1 - pd / SCARE_RADIUS) * SCARE_FORCE;
+          fx += (px / pd) * pw;
+          fy += (py / pd) * pw;
+        }
+      }
+
+      b.fx = fx; b.fy = fy;
+    }
+
+    // integrate
+    for (var k = 0; k < n; k++) {
+      var bb = boids[k];
+      bb.vx += bb.fx; bb.vy += bb.fy;
+      var sp = Math.sqrt(bb.vx * bb.vx + bb.vy * bb.vy);
+      if (sp > MAX_SPEED) { var d1 = MAX_SPEED / sp; bb.vx *= d1; bb.vy *= d1; }
+      else if (sp < MIN_SPEED && sp > 0) { var d2b = MIN_SPEED / sp; bb.vx *= d2b; bb.vy *= d2b; }
+      bb.x += bb.vx; bb.y += bb.vy;
+
+      if (bb.x < -8) bb.x = W + 8; else if (bb.x > W + 8) bb.x = -8;
+      if (bb.y < -8) bb.y = H + 8; else if (bb.y > H + 8) bb.y = -8;
+
+      // hue maps to speed: slow = teal, fast = pale cyan-green
+      var t = (sp - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+      bb.hue = 188 - t * 56;
+    }
+  }
+
+  function draw() {
+    // soft trailing fade for motion blur
+    ctx.fillStyle = "rgba(6, 18, 26, 0.34)";
+    ctx.fillRect(0, 0, W, H);
+
+    for (var i = 0; i < boids.length; i++) {
+      var b = boids[i];
+      var ang = Math.atan2(b.vy, b.vx);
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(7, 0);
+      ctx.lineTo(-5, 3.4);
+      ctx.lineTo(-5, -3.4);
+      ctx.closePath();
+      ctx.fillStyle = "hsl(" + b.hue.toFixed(0) + ", 78%, 62%)";
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // glow ring while scattering
+    if (scare.active) {
+      ctx.beginPath();
+      ctx.arc(scare.x, scare.y, SCARE_RADIUS, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 130, 120, 0.45)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  var lastCount = -1;
+  function updateCount() {
+    if (boids.length !== lastCount) {
+      lastCount = boids.length;
+      countEl.textContent = lastCount + " boids";
+    }
+  }
+
+  function loop() {
+    step();
+    draw();
+    updateCount();
+    requestAnimationFrame(loop);
+  }
+
+  // boot
+  resize();
+  initBoids();
+  ctx.fillStyle = "#06121a";
+  ctx.fillRect(0, 0, W, H);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,630 @@
+<!--ARCADELAB
+title: Pocket Sequencer
+description: A 16-step pentatonic music sequencer — tap cells to build a loop and watch the playhead sweep in time.
+emoji: 🎹
+color: blue
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pocket Sequencer</title>
+<style>
+  :root {
+    --bg: #0a0f1f;
+    --bg2: #111a33;
+    --panel: rgba(17, 26, 51, 0.9);
+    --accent: #5b9dff;
+    --accent2: #7ee0ff;
+    --text: #e6edff;
+    --muted: #8da3cc;
+    --cell-off: #1a2647;
+    --cell-edge: #2c3d6b;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background:
+      radial-gradient(ellipse at 20% 0%, #15224a 0%, transparent 55%),
+      radial-gradient(ellipse at 90% 100%, #1a1840 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: clamp(10px, 2.4vw, 22px);
+    gap: clamp(8px, 1.8vw, 16px);
+  }
+  /* header */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    animation: rise 0.5s cubic-bezier(.2,.8,.2,1) both;
+  }
+  header .emoji {
+    font-size: clamp(22px, 5vw, 30px);
+    filter: drop-shadow(0 2px 6px rgba(91,157,255,0.5));
+  }
+  header h1 {
+    margin: 0;
+    font-size: clamp(17px, 4.2vw, 23px);
+    letter-spacing: 0.3px;
+  }
+  header p {
+    margin: 2px 0 0;
+    font-size: clamp(11px, 2.8vw, 13px);
+    color: var(--muted);
+  }
+  .htext { min-width: 0; }
+  /* grid area */
+  #gridwrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    background: var(--panel);
+    border: 1px solid rgba(91,157,255,0.18);
+    border-radius: 16px;
+    padding: clamp(8px, 1.8vw, 14px);
+    box-shadow: 0 14px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    display: flex;
+    animation: rise 0.5s 0.06s cubic-bezier(.2,.8,.2,1) both;
+  }
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    border-radius: 10px;
+  }
+  /* controls */
+  #controls {
+    flex-shrink: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: clamp(8px, 2vw, 14px);
+    animation: rise 0.5s 0.12s cubic-bezier(.2,.8,.2,1) both;
+  }
+  button {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    border-radius: 14px;
+    padding: 12px 20px;
+    cursor: pointer;
+    border: 1px solid rgba(91,157,255,0.4);
+    background: linear-gradient(180deg, rgba(91,157,255,0.26), rgba(91,157,255,0.1));
+    transition: transform 0.12s ease, background 0.15s ease;
+    touch-action: manipulation;
+  }
+  button:hover { background: linear-gradient(180deg, rgba(91,157,255,0.4), rgba(91,157,255,0.18)); }
+  button:active { transform: scale(0.93); }
+  #play {
+    min-width: 116px;
+    background: linear-gradient(180deg, #4f8fff, #3563d8);
+    border-color: #6fa6ff;
+    box-shadow: 0 6px 18px rgba(53,99,216,0.45);
+  }
+  #play.playing {
+    background: linear-gradient(180deg, #ff7a8a, #d63d54);
+    border-color: #ff9aa6;
+    box-shadow: 0 6px 18px rgba(214,61,84,0.45);
+  }
+  .tempo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 200px;
+    min-width: 160px;
+    background: var(--panel);
+    border: 1px solid rgba(91,157,255,0.18);
+    border-radius: 14px;
+    padding: 9px 14px;
+  }
+  .tempo label {
+    font-size: 12.5px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .tempo .bpm {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--accent2);
+    font-variant-numeric: tabular-nums;
+    min-width: 58px;
+    text-align: right;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent) 50%, var(--cell-off) 50%);
+    outline: none;
+    margin: 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #eaf1ff;
+    border: 3px solid var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #eaf1ff;
+    border: 3px solid var(--accent);
+    cursor: pointer;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (max-width: 430px) {
+    header p { display: none; }
+    button { padding: 11px 15px; font-size: 14px; }
+    #play { min-width: 96px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="emoji">🎹</div>
+    <div class="htext">
+      <h1>Pocket Sequencer</h1>
+      <p>Tap the grid to place notes, then press Play.</p>
+    </div>
+  </header>
+  <div id="gridwrap">
+    <canvas id="grid"></canvas>
+  </div>
+  <div id="controls">
+    <button id="play">Play</button>
+    <button id="clear">Clear</button>
+    <div class="tempo">
+      <label for="bpm">Tempo</label>
+      <input type="range" id="bpm" min="60" max="180" step="1" value="112">
+      <span class="bpm" id="bpmval">112 BPM</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("grid");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) { return; }
+
+  var playBtn = document.getElementById("play");
+  var clearBtn = document.getElementById("clear");
+  var bpmSlider = document.getElementById("bpm");
+  var bpmVal = document.getElementById("bpmval");
+
+  // --- sequencer model ---------------------------------------------------
+  var STEPS = 16;
+  // pentatonic (major) scale — always consonant. Low row -> high row visually,
+  // index 0 = lowest pitch. Frequencies in Hz (A minor pentatonic-ish C major).
+  var SCALE = [
+    { freq: 261.63, name: "C4" },
+    { freq: 293.66, name: "D4" },
+    { freq: 329.63, name: "E4" },
+    { freq: 392.00, name: "G4" },
+    { freq: 440.00, name: "A4" },
+    { freq: 523.25, name: "C5" }
+  ];
+  var ROWS = SCALE.length;
+  // grid[row][step] = boolean
+  var grid = [];
+  for (var r = 0; r < ROWS; r++) {
+    grid.push(new Array(STEPS).fill(false));
+  }
+  // a pleasant default pattern so it isn't empty on load
+  var seed = [[0,0],[2,2],[4,4],[2,6],[5,8],[3,10],[1,12],[3,14],[0,8],[4,0]];
+  seed.forEach(function (p) { if (grid[p[0]]) { grid[p[0]][p[1]] = true; } });
+
+  var currentStep = -1;
+  var pulse = new Float32Array(ROWS * STEPS); // 0..1 brightness pulse per cell
+
+  // distinct hue per row, low->high
+  var ROW_HUE = [205, 192, 168, 130, 45, 18];
+
+  // --- canvas sizing -----------------------------------------------------
+  var dpr = 1, W = 0, H = 0;
+  var pad = 0, cellW = 0, cellH = 0, gx = 0, gy = 0, gridW = 0, gridH = 0;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var rect = canvas.getBoundingClientRect();
+    var cw = Math.max(1, Math.floor(rect.width));
+    var ch = Math.max(1, Math.floor(rect.height));
+    W = Math.max(1, Math.floor(cw * dpr));
+    H = Math.max(1, Math.floor(ch * dpr));
+    canvas.width = W;
+    canvas.height = H;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // draw in CSS pixels
+
+    // layout in CSS pixels
+    var labelW = cw < 360 ? 0 : Math.min(34, cw * 0.09);
+    pad = Math.max(3, cw * 0.012);
+    gx = labelW;
+    gy = 0;
+    gridW = cw - labelW;
+    gridH = ch;
+    cellW = gridW / STEPS;
+    cellH = gridH / ROWS;
+    LABEL_W = labelW;
+    draw();
+  }
+  var LABEL_W = 0;
+
+  // --- drawing -----------------------------------------------------------
+  function roundRect(x, y, w, h, r) {
+    if (w < 2 * r) { r = w / 2; }
+    if (h < 2 * r) { r = h / 2; }
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw() {
+    var cw = W / dpr, ch = H / dpr;
+    ctx.clearRect(0, 0, cw, ch);
+
+    var rad = Math.min(cellW, cellH) * 0.2;
+
+    for (var r = 0; r < ROWS; r++) {
+      var visRow = ROWS - 1 - r;     // index 0 (lowest pitch) drawn at bottom
+      var cy = gy + visRow * cellH;
+      var hue = ROW_HUE[r];
+
+      // pitch label
+      if (LABEL_W > 4) {
+        ctx.fillStyle = "rgba(141,163,204,0.85)";
+        ctx.font = "600 " + Math.min(13, cellH * 0.32) + "px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(SCALE[r].name, LABEL_W / 2, cy + cellH / 2);
+      }
+
+      for (var s = 0; s < STEPS; s++) {
+        var cx = gx + s * cellW;
+        var x = cx + pad, y = cy + pad;
+        var w = cellW - pad * 2, h = cellH - pad * 2;
+        var on = grid[r][s];
+        var isBeat = (s % 4 === 0);
+        var isHead = (s === currentStep);
+        var pIdx = r * STEPS + s;
+        var p = pulse[pIdx];
+
+        if (on) {
+          var lift = 1 + p * 0.06;
+          var cxm = x + w / 2, cym = y + h / 2;
+          ctx.save();
+          ctx.translate(cxm, cym);
+          ctx.scale(lift, lift);
+          ctx.translate(-cxm, -cym);
+          var grad = ctx.createLinearGradient(x, y, x, y + h);
+          var l1 = 64 + p * 22;
+          var l2 = 42 + p * 16;
+          grad.addColorStop(0, "hsl(" + hue + ",92%," + l1 + "%)");
+          grad.addColorStop(1, "hsl(" + hue + ",88%," + l2 + "%)");
+          ctx.fillStyle = grad;
+          ctx.shadowColor = "hsla(" + hue + ",95%,60%," + (0.45 + p * 0.5) + ")";
+          ctx.shadowBlur = 8 + p * 22;
+          roundRect(x, y, w, h, rad);
+          ctx.fill();
+          ctx.restore();
+          // glossy top highlight
+          ctx.fillStyle = "rgba(255,255,255," + (0.18 + p * 0.25) + ")";
+          roundRect(x + w * 0.16, y + h * 0.14, w * 0.68, h * 0.26, rad * 0.7);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = isBeat ? "rgba(44,61,107,0.62)" : "rgba(26,38,71,0.62)";
+          roundRect(x, y, w, h, rad);
+          ctx.fill();
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = "rgba(91,157,255,0.14)";
+          roundRect(x, y, w, h, rad);
+          ctx.stroke();
+        }
+
+        // playhead column wash
+        if (isHead) {
+          ctx.fillStyle = "rgba(126,224,255,0.16)";
+          roundRect(x - pad * 0.5, y - pad * 0.5, w + pad, h + pad, rad);
+          ctx.fill();
+        }
+      }
+    }
+
+    // playhead vertical line
+    if (currentStep >= 0) {
+      var hx = gx + currentStep * cellW;
+      ctx.fillStyle = "rgba(126,224,255,0.9)";
+      ctx.shadowColor = "rgba(126,224,255,0.9)";
+      ctx.shadowBlur = 12;
+      ctx.fillRect(hx, gy, 3, gridH);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // --- animation loop (pulse decay + playhead) ---------------------------
+  var lastT = 0;
+  function frame(t) {
+    if (!lastT) { lastT = t; }
+    var dt = Math.min(0.05, (t - lastT) / 1000);
+    lastT = t;
+    var dirty = false;
+    for (var i = 0; i < pulse.length; i++) {
+      if (pulse[i] > 0) {
+        pulse[i] -= dt * 3.4;
+        if (pulse[i] < 0) { pulse[i] = 0; }
+        dirty = true;
+      }
+    }
+    if (dirty || needsRedraw) {
+      needsRedraw = false;
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  var needsRedraw = false;
+  requestAnimationFrame(frame);
+
+  // --- audio (created lazily on first gesture) ---------------------------
+  var audioCtx = null;
+  var masterGain = null;
+
+  function ensureAudio() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { return false; }
+      audioCtx = new AC();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 0.62;
+      masterGain.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+    return true;
+  }
+
+  // a short plucky synth tone: two detuned oscillators + gain envelope
+  function playNote(freq, when) {
+    if (!audioCtx) { return; }
+    var dur = 0.42;
+    var g = audioCtx.createGain();
+    g.connect(masterGain);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.5, when + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+
+    var lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(4200, when);
+    lp.frequency.exponentialRampToValueAtTime(900, when + dur);
+    lp.connect(g);
+
+    var o1 = audioCtx.createOscillator();
+    o1.type = "triangle";
+    o1.frequency.value = freq;
+    o1.connect(lp);
+
+    var o2 = audioCtx.createOscillator();
+    o2.type = "sine";
+    o2.frequency.value = freq * 2.004; // gentle shimmer
+    var g2 = audioCtx.createGain();
+    g2.gain.value = 0.28;
+    o2.connect(g2);
+    g2.connect(lp);
+
+    o1.start(when);
+    o2.start(when);
+    o1.stop(when + dur + 0.02);
+    o2.stop(when + dur + 0.02);
+  }
+
+  // --- transport: look-ahead scheduler -----------------------------------
+  var playing = false;
+  var bpm = parseInt(bpmSlider.value, 10);
+  var nextNoteTime = 0;
+  var scheduleStep = 0;
+  var schedulerTimer = 0;
+  var LOOKAHEAD = 0.1;       // seconds of audio scheduled ahead
+  var TICK = 25;             // ms between scheduler wakeups
+  // visual sync queue: {step, time}
+  var visQueue = [];
+
+  function stepDuration() {
+    // 16 steps = 4 beats (16th notes)
+    return (60 / bpm) / 4;
+  }
+
+  function scheduler() {
+    if (!playing || !audioCtx) { return; }
+    while (nextNoteTime < audioCtx.currentTime + LOOKAHEAD) {
+      var step = scheduleStep;
+      for (var r = 0; r < ROWS; r++) {
+        if (grid[r][step]) {
+          playNote(SCALE[r].freq, nextNoteTime);
+        }
+      }
+      visQueue.push({ step: step, time: nextNoteTime });
+      nextNoteTime += stepDuration();
+      scheduleStep = (scheduleStep + 1) % STEPS;
+    }
+    schedulerTimer = setTimeout(scheduler, TICK);
+  }
+
+  // visual playhead driven off audio clock
+  function visTick() {
+    if (!playing || !audioCtx) { return; }
+    var now = audioCtx.currentTime;
+    while (visQueue.length && visQueue[0].time <= now) {
+      var ev = visQueue.shift();
+      currentStep = ev.step;
+      // pulse lit cells in this column
+      for (var r = 0; r < ROWS; r++) {
+        if (grid[r][ev.step]) {
+          pulse[r * STEPS + ev.step] = 1;
+        }
+      }
+      needsRedraw = true;
+    }
+    visRAF = requestAnimationFrame(visTick);
+  }
+  var visRAF = 0;
+
+  function startTransport() {
+    if (!ensureAudio()) { return; }
+    playing = true;
+    playBtn.textContent = "Stop";
+    playBtn.classList.add("playing");
+    scheduleStep = 0;
+    currentStep = -1;
+    visQueue.length = 0;
+    nextNoteTime = audioCtx.currentTime + 0.06;
+    scheduler();
+    visRAF = requestAnimationFrame(visTick);
+  }
+
+  function stopTransport() {
+    playing = false;
+    playBtn.textContent = "Play";
+    playBtn.classList.remove("playing");
+    if (schedulerTimer) { clearTimeout(schedulerTimer); schedulerTimer = 0; }
+    if (visRAF) { cancelAnimationFrame(visRAF); visRAF = 0; }
+    visQueue.length = 0;
+    currentStep = -1;
+    needsRedraw = true;
+  }
+
+  playBtn.addEventListener("click", function () {
+    if (playing) { stopTransport(); } else { startTransport(); }
+  });
+
+  clearBtn.addEventListener("click", function () {
+    for (var r = 0; r < ROWS; r++) {
+      for (var s = 0; s < STEPS; s++) { grid[r][s] = false; }
+    }
+    needsRedraw = true;
+  });
+
+  // --- tempo slider ------------------------------------------------------
+  function updateBpmUI() {
+    bpmVal.textContent = bpm + " BPM";
+    var pct = (bpm - 60) / (180 - 60) * 100;
+    bpmSlider.style.background =
+      "linear-gradient(90deg, var(--accent) 0%, var(--accent) " + pct +
+      "%, var(--cell-off) " + pct + "%, var(--cell-off) 100%)";
+  }
+  bpmSlider.addEventListener("input", function () {
+    bpm = parseInt(bpmSlider.value, 10);
+    updateBpmUI();
+  });
+  updateBpmUI();
+
+  // --- grid input (pointer = mouse + touch) ------------------------------
+  function cellFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+    if (x < gx || x > gx + gridW || y < gy || y > gy + gridH) { return null; }
+    var s = Math.floor((x - gx) / cellW);
+    var visRow = Math.floor((y - gy) / cellH);
+    var r = ROWS - 1 - visRow;
+    if (s < 0 || s >= STEPS || r < 0 || r >= ROWS) { return null; }
+    return { r: r, s: s };
+  }
+
+  // drag-paint: first touched cell sets the paint mode (on/off)
+  var painting = false;
+  var paintMode = true;
+  var touched = {};
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var c = cellFromEvent(e);
+    if (!c) { return; }
+    ensureAudio(); // first gesture — safe place to unlock audio
+    painting = true;
+    paintMode = !grid[c.r][c.s];
+    touched = {};
+    applyPaint(c);
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+  }, { passive: false });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!painting) { return; }
+    e.preventDefault();
+    var c = cellFromEvent(e);
+    if (c) { applyPaint(c); }
+  }, { passive: false });
+
+  function endPaint() { painting = false; }
+  canvas.addEventListener("pointerup", endPaint);
+  canvas.addEventListener("pointercancel", endPaint);
+  window.addEventListener("blur", function () {
+    painting = false;
+  });
+
+  function applyPaint(c) {
+    var key = c.r + ":" + c.s;
+    if (touched[key]) { return; }
+    touched[key] = true;
+    grid[c.r][c.s] = paintMode;
+    if (paintMode) {
+      pulse[c.r * STEPS + c.s] = 1;
+      // audible feedback when placing a note while stopped
+      if (!playing && audioCtx) {
+        playNote(SCALE[c.r].freq, audioCtx.currentTime + 0.001);
+      }
+    }
+    needsRedraw = true;
+  }
+
+  // --- resize handling ---------------------------------------------------
+  var resizeTimer = 0;
+  window.addEventListener("resize", function () {
+    if (resizeTimer) { clearTimeout(resizeTimer); }
+    resizeTimer = setTimeout(function () { resizeTimer = 0; resize(); }, 120);
+  });
+  window.addEventListener("orientationchange", function () {
+    setTimeout(resize, 200);
+  });
+
+  // --- boot --------------------------------------------------------------
+  resize(); // layout + first draw before anything animates
+})();
+</script>
+</body>
+</html>

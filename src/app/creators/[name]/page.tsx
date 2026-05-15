@@ -29,7 +29,7 @@ const getCreatorAndGames = cache(async function getCreatorAndGames(name: string)
 
   const { data: games } = await supabase
     .from("games")
-    .select("id, slug, title, description, play_count, like_count, emoji, color, created_at")
+    .select("id, slug, title, description, play_count, like_count, emoji, color, thumbnail_url, preview_url, created_at")
     .eq("creator_id", creator.id)
     .eq("status", "active")
     .order("created_at", { ascending: true });
@@ -124,6 +124,8 @@ export default async function CreatorPage({ params }: Props) {
                 likeCount={game.like_count}
                 emoji={game.emoji}
                 color={game.color}
+                thumbnailUrl={game.thumbnail_url}
+                previewUrl={game.preview_url}
               />
             </div>
           ))}

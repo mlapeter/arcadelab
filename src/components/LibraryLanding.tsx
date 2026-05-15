@@ -21,6 +21,8 @@ interface GameRow {
   like_count: number;
   emoji?: string | null;
   color?: string | null;
+  thumbnail_url?: string | null;
+  preview_url?: string | null;
 }
 
 interface Props {
@@ -144,6 +146,8 @@ export default function LibraryLanding({ meta, games }: Props) {
                 likeCount={g.like_count}
                 emoji={g.emoji}
                 color={g.color}
+                thumbnailUrl={g.thumbnail_url}
+                previewUrl={g.preview_url}
               />
             ))}
           </div>

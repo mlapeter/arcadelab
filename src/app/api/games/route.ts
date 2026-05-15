@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
   const { data: games, error, count } = await supabase
     .from("games")
-    .select("id, slug, title, description, creator_id, libraries, play_count, like_count, emoji, color, created_at", { count: "exact" })
+    .select("id, slug, title, description, creator_id, libraries, play_count, like_count, emoji, color, thumbnail_url, preview_url, created_at", { count: "exact" })
     .eq("status", "active")
     .order(orderColumn, { ascending: false })
     .range(offset, offset + limit - 1);

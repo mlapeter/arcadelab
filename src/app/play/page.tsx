@@ -12,7 +12,7 @@ import {
 async function getGames() {
   const { data: games } = await supabase
     .from("games")
-    .select("id, slug, title, creator_id, play_count, like_count, emoji, color")
+    .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url")
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(40);
@@ -43,6 +43,8 @@ async function getGames() {
     like_count: game.like_count,
     emoji: game.emoji,
     color: game.color,
+    thumbnail_url: game.thumbnail_url,
+    preview_url: game.preview_url,
   }));
 }
 

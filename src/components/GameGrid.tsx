@@ -28,6 +28,8 @@ export default function GameGrid({ games }: { games: Game[] }) {
           likeCount={game.like_count}
           emoji={game.emoji}
           color={game.color}
+          thumbnailUrl={game.thumbnail_url}
+          previewUrl={game.preview_url}
         />
       ))}
     </div>

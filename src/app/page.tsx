@@ -21,7 +21,7 @@ async function getFeaturedGames() {
 
   const { data: games } = await supabase
     .from("games")
-    .select("id, slug, title, creator_id, play_count, like_count, emoji, color")
+    .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url")
     .in("slug", slugs)
     .eq("status", "active");
 
@@ -50,6 +50,8 @@ async function getFeaturedGames() {
       like_count: g.like_count,
       emoji: g.emoji,
       color: g.color,
+      thumbnail_url: g.thumbnail_url,
+      preview_url: g.preview_url,
     }))
     .sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0));
 }
@@ -300,6 +302,8 @@ color: blue
                 likeCount={game.like_count}
                 emoji={game.emoji}
                 color={game.color}
+                thumbnailUrl={game.thumbnail_url}
+                previewUrl={game.preview_url}
               />
             ))}
           </div>

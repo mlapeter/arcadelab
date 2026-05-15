@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRef } from "react";
 
 interface GameCardProps {
   slug: string;
@@ -8,6 +11,10 @@ interface GameCardProps {
   likeCount: number;
   emoji?: string | null;
   color?: string | null;
+  /** Static thumbnail (captured screenshot). Falls back to emoji/gradient if absent. */
+  thumbnailUrl?: string | null;
+  /** Short looping preview video, played on desktop hover. */
+  previewUrl?: string | null;
 }
 
 const THUMB_STYLES = [
@@ -50,29 +57,81 @@ export default function GameCard({
   likeCount,
   emoji,
   color,
+  thumbnailUrl,
+  previewUrl,
 }: GameCardProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const fallback = pickStyle(title);
   const displayEmoji = emoji || fallback.emoji;
   const displayBg = (color && COLOR_GRADIENTS[color]) || fallback.bg;
+  const hasThumb = Boolean(thumbnailUrl);
+
+  // Desktop hover plays the preview clip; touch devices just show the still.
+  function handleEnter() {
+    const v = videoRef.current;
+    if (v) {
+      v.muted = true; // ensure the property is set so play() is allowed
+      v.play().catch(() => {});
+    }
+  }
+  function handleLeave() {
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.currentTime = 0;
+    }
+  }
 
   return (
-    <Link href={`/play/${slug}`} className="group">
+    <Link
+      href={`/play/${slug}`}
+      className="group"
+      onMouseEnter={previewUrl ? handleEnter : undefined}
+      onMouseLeave={previewUrl ? handleLeave : undefined}
+    >
       <div className="rpg-panel transition-transform hover:-translate-y-1 hover:shadow-[inset_0_0_0_2px_var(--parchment-dark),inset_0_0_0_4px_var(--wood-mid),8px_8px_0_rgba(0,0,0,0.3)]">
-        {/* Thumbnail with gradient + pattern overlay */}
+        {/* Thumbnail: captured image (+ hover video) or emoji/gradient fallback */}
         <div
           className="aspect-video flex items-center justify-center relative overflow-hidden"
-          style={{ background: displayBg }}
+          style={hasThumb ? undefined : { background: displayBg }}
         >
-          {/* Subtle pixel grid overlay */}
-          <div
-            className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage: "repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px), repeating-linear-gradient(90deg, transparent 0px, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)",
-            }}
-          />
-          <span className="text-4xl relative z-[1] transition-transform group-hover:scale-125 drop-shadow-[2px_2px_0_rgba(0,0,0,0.3)]">
-            {displayEmoji}
-          </span>
+          {hasThumb ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumbnailUrl as string}
+                alt={title}
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              {previewUrl && (
+                <video
+                  ref={videoRef}
+                  src={previewUrl}
+                  muted
+                  loop
+                  playsInline
+                  preload="none"
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {/* Subtle pixel grid overlay */}
+              <div
+                className="absolute inset-0 opacity-10"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(0deg, transparent 0px, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px), repeating-linear-gradient(90deg, transparent 0px, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)",
+                }}
+              />
+              <span className="text-4xl relative z-[1] transition-transform group-hover:scale-125 drop-shadow-[2px_2px_0_rgba(0,0,0,0.3)]">
+                {displayEmoji}
+              </span>
+            </>
+          )}
         </div>
 
         {/* Info area on parchment */}

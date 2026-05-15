@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 const getGames = cache(async function getGamesUsingLibrary() {
   const { data: games } = await supabase
     .from("games")
-    .select("id, slug, title, creator_id, play_count, like_count, emoji, color")
+    .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url")
     .eq("status", "active")
     .contains("libraries", ["three"])
     .order("play_count", { ascending: false })
@@ -53,6 +53,8 @@ const getGames = cache(async function getGamesUsingLibrary() {
     like_count: g.like_count,
     emoji: g.emoji,
     color: g.color,
+    thumbnail_url: g.thumbnail_url,
+    preview_url: g.preview_url,
   }));
 });
 

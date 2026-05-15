@@ -694,3 +694,23 @@ Each follows the §6 recipe: question-format H1, Quick Answer block, question-fo
 **Excluded:** `how-we-made-arcadelab-readable-by-ai-agents` — the P2.5 narrative HN piece, still gated on decision D4.
 
 **Build status:** ✅ `npm run build` green; `npm run lint` clean (only the pre-existing `setRemixOf` warning in `PublishForm.tsx`).
+
+### 2026-05-15 — Showcase gallery published (autonomous `/goal` run)
+
+Second autonomous `/goal` session. Built 8 polished single-file HTML demos — one per category — and published them live through the real publish flow, so they are real DB games (remixable, with `/source` pages, in the gallery).
+
+**8 showcase demos, now live:**
+- Physics — Gravity Wells (`/play/gravity-wells-arcadelab`)
+- Generative art — Flow Field Bloom (`/play/flow-field-bloom-arcadelab`)
+- Math — Mandelbrot Voyager (`/play/mandelbrot-voyager-arcadelab`)
+- Music — Pocket Sequencer (`/play/pocket-sequencer-arcadelab`)
+- Simulation — Boids Flock (`/play/boids-flock-arcadelab`)
+- Puzzle — Lights Out (`/play/lights-out-arcadelab`)
+- Data viz — Planet Explorer (`/play/planet-explorer-arcadelab`)
+- Narrative — The Lighthouse Keeper (`/play/the-lighthouse-keeper-arcadelab`)
+
+Published under a new dedicated creator, "ArcadeLab". Each demo got a `src/lib/seo/game-overrides.ts` entry — curated long description, educational topics, `LearningResource` + `FAQPage` schema, related-content cross-links, `featured: true`.
+
+Verified before merge: all 8 render 200 (play page + render endpoint), build green, lint clean, overrides confirmed rendering on real `/play` pages. Merged to `main` (commit `507e405`, deployed). IndexNow pinged for all 33 new URLs from Goals 1 + 2.
+
+Note: `featured: true` is latent — nothing consumes `getFeaturedGameSlugs()` yet. Wiring homepage/library-page featuring of the 8 demos is a follow-up (good candidate for the Phase 5 surface or the Goal 3 audit).

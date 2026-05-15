@@ -204,6 +204,73 @@ export const ARTICLES: ArticleMeta[] = [
     emoji: "🔗",
     tagline: "Artifact in chat to a link anyone can open.",
   },
+  {
+    slug: "build-physics-simulation-with-claude",
+    title: "How do I build a physics simulation with Claude?",
+    description:
+      "How to build an interactive physics simulation with an AI assistant and publish it as a single shareable HTML file.",
+    publishedDate: "2026-05-15",
+    emoji: "⚛️",
+    tagline: "Simulate it, then share it.",
+    relatedPromptSlug: "make-an-interactive-visualization",
+  },
+  {
+    slug: "make-interactive-explainer-with-ai",
+    title: "How do I make an interactive explainer with AI?",
+    description:
+      "Turn a concept into an interactive explainer — sliders, animations, live diagrams — with an AI assistant, and publish it as one HTML file.",
+    publishedDate: "2026-05-15",
+    emoji: "🧠",
+    tagline: "Explain it by letting people poke at it.",
+    relatedPromptSlug: "make-an-interactive-visualization",
+  },
+  {
+    slug: "share-bret-victor-style-explorable",
+    title: "How do I share a Bret Victor-style explorable?",
+    description:
+      "Explorable explanations — interactive essays in the Bret Victor tradition — work beautifully as single-file HTML. Here is how to publish one.",
+    publishedDate: "2026-05-15",
+    emoji: "🔭",
+    tagline: "Explorable explanations, one paste away.",
+  },
+  {
+    slug: "host-interactive-essay-online",
+    title: "Where can I host an interactive essay online?",
+    description:
+      "An interactive essay mixes prose with live diagrams and controls. Here is where to host one as a single self-contained HTML file.",
+    publishedDate: "2026-05-15",
+    emoji: "📜",
+    tagline: "Prose plus interaction, on its own URL.",
+  },
+  {
+    slug: "single-file-data-viz-publishing",
+    title: "How do I publish a single-file data visualization?",
+    description:
+      "Publish a data visualization — a chart, a dashboard, an interactive graphic — as one self-contained HTML file with a shareable URL.",
+    publishedDate: "2026-05-15",
+    emoji: "📈",
+    tagline: "One chart, one file, one URL.",
+    relatedLibrarySlug: "d3",
+  },
+  {
+    slug: "interactive-visualization-prompts-for-claude",
+    title: "What prompts make a good interactive visualization?",
+    description:
+      "How to prompt an AI assistant for an interactive visualization that is publishable as a single HTML file — with an example prompt.",
+    publishedDate: "2026-05-15",
+    emoji: "✨",
+    tagline: "Prompt for a visualization, get a publishable file.",
+    relatedPromptSlug: "make-an-interactive-visualization",
+  },
+  {
+    slug: "from-jupyter-notebook-to-shareable-explainer",
+    title: "How do I turn a Jupyter notebook into a shareable explainer?",
+    description:
+      "A Jupyter notebook is great for analysis but hard to share. Here is how to turn its key result into an interactive HTML explainer anyone can open.",
+    publishedDate: "2026-05-15",
+    emoji: "📓",
+    tagline: "From notebook cells to a link anyone can open.",
+  },
 ];
 
 export function getArticle(slug: string): ArticleMeta | undefined {

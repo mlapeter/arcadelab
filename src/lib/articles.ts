@@ -158,6 +158,52 @@ export const ARTICLES: ArticleMeta[] = [
     emoji: "📐",
     tagline: "A starting skeleton for any browser game.",
   },
+  {
+    slug: "prompts-to-make-a-browser-game-with-ai",
+    title: "What prompts make a good browser game with AI?",
+    description:
+      "How to prompt an AI assistant so it produces a publishable single-file browser game — what to specify, what to leave out, and an example prompt.",
+    publishedDate: "2026-05-15",
+    emoji: "💬",
+    tagline: "Prompt it right, publish it fast.",
+    relatedPromptSlug: "make-a-phaser-game",
+  },
+  {
+    slug: "common-bugs-ai-generated-games",
+    title: "What are the common bugs in AI-generated games?",
+    description:
+      "The recurring bugs in AI-generated browser games — external scripts, blocked network calls, sizing issues — and how to spot and fix them before publishing.",
+    publishedDate: "2026-05-15",
+    emoji: "🐛",
+    tagline: "Catch the usual suspects before you publish.",
+  },
+  {
+    slug: "make-an-html-game-in-30-minutes-with-ai",
+    title: "How do I make an HTML game in 30 minutes with AI?",
+    description:
+      "A 30-minute path from idea to a published browser game using an AI assistant and a single HTML file.",
+    publishedDate: "2026-05-15",
+    emoji: "⏱️",
+    tagline: "Idea to playable link in half an hour.",
+  },
+  {
+    slug: "game-ideas-you-can-build-with-ai-tonight",
+    title: "What game ideas can I build with AI tonight?",
+    description:
+      "Ten browser game ideas small enough to build with an AI assistant in one evening and publish as a single HTML file.",
+    publishedDate: "2026-05-15",
+    emoji: "🌙",
+    tagline: "Small, finishable, shippable tonight.",
+  },
+  {
+    slug: "from-claude-artifact-to-public-url",
+    title: "How do I turn a Claude artifact into a public URL?",
+    description:
+      "Claude artifacts are interactive but live inside the chat. Here is how to turn one into a permanent public URL anyone can open.",
+    publishedDate: "2026-05-15",
+    emoji: "🔗",
+    tagline: "Artifact in chat to a link anyone can open.",
+  },
 ];
 
 export function getArticle(slug: string): ArticleMeta | undefined {

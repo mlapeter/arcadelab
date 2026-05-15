@@ -670,3 +670,27 @@ User logged into Vercel, then I drove the remaining dashboard work end-to-end.
 - Sitemap submitted directly: `https://arcadelab.ai/sitemap.xml` — Status: Processing
 
 **Phase 0 is fully complete.** Next session can pick up Phase 2 (Wikidata, AlternativeTo, dev.to cross-posts) or start Phase 5 (prompt-test scoreboard) immediately.
+
+### 2026-05-15 — Content backlog drained (autonomous `/goal` run)
+
+Ran as an autonomous `/goal` session: wrote every remaining §7 P4.3 backlog article that did not already exist and was not a near-duplicate of an existing guide. Branch `goal/content-backlog` (opened for review, not merged to `main`).
+
+**25 new `/learn` articles added — the launch batch of 12 grows to 37.**
+
+- **Creator-focused (8):** vibe-coding-publish-platforms, cursor-bolt-claude-publishing-workflow, single-file-html-game-template, prompts-to-make-a-browser-game-with-ai, common-bugs-ai-generated-games, make-an-html-game-in-30-minutes-with-ai, game-ideas-you-can-build-with-ai-tonight, from-claude-artifact-to-public-url
+- **Interactive content (7):** build-physics-simulation-with-claude, make-interactive-explainer-with-ai, share-bret-victor-style-explorable, host-interactive-essay-online, single-file-data-viz-publishing, interactive-visualization-prompts-for-claude, from-jupyter-notebook-to-shareable-explainer
+- **Technical (4):** sandboxed-iframe-game-embed-explained, connect-src-none-iframe-csp, single-file-html-with-cdn-libraries, why-single-file-html-content-is-back
+- **Comparison (1):** arcadelab-vs-codepen-for-games
+- **Educator / parent (3):** classroom-friendly-game-publishing, homeschool-coding-projects-with-ai, safe-game-sharing-for-kids
+- **Meta / AI-curious (2):** what-is-an-llms-txt-file, building-ai-friendly-websites
+
+Each follows the §6 recipe: question-format H1, Quick Answer block, question-format H2s, 5-question FAQ (FAQPage schema), in-body internal links plus the auto RelatedArticles, and a one-line CTA. Workflow articles also carry HowTo schema. The dynamic sitemap picks them all up via the `ARTICLES` registry.
+
+**Skipped as near-duplicates of existing articles (per the `/goal` condition):**
+- `arcadelab-vs-glitch-for-games` — Glitch is already covered in `arcadelab-vs-itchio-glitch-github-pages`
+- `arcadelab-vs-github-pages-for-games` — GitHub Pages is already covered in `arcadelab-vs-itchio-glitch-github-pages`
+- `claude-artifact-to-shareable-url` — same topic as `from-claude-artifact-to-public-url`, which was written instead
+
+**Excluded:** `how-we-made-arcadelab-readable-by-ai-agents` — the P2.5 narrative HN piece, still gated on decision D4.
+
+**Build status:** ✅ `npm run build` green; `npm run lint` clean (only the pre-existing `setRemixOf` warning in `PublishForm.tsx`).

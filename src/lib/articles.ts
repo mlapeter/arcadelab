@@ -271,6 +271,51 @@ export const ARTICLES: ArticleMeta[] = [
     emoji: "📓",
     tagline: "From notebook cells to a link anyone can open.",
   },
+  {
+    slug: "sandboxed-iframe-game-embed-explained",
+    title: "How does a sandboxed iframe game embed work?",
+    description:
+      "What a sandboxed iframe is, why game platforms use one, and how to embed a sandboxed game safely in your own site.",
+    publishedDate: "2026-05-15",
+    emoji: "🪟",
+    tagline: "Safe embeds, explained.",
+  },
+  {
+    slug: "connect-src-none-iframe-csp",
+    title: "What does connect-src 'none' do in an iframe CSP?",
+    description:
+      "How the connect-src 'none' Content Security Policy directive blocks network access in sandboxed iframes — and why game hosts use it.",
+    publishedDate: "2026-05-15",
+    emoji: "🛡️",
+    tagline: "Why your published game has no network access.",
+  },
+  {
+    slug: "single-file-html-with-cdn-libraries",
+    title: "How do I use CDN libraries in a single-file HTML page?",
+    description:
+      "How to use libraries like Phaser, p5.js, and Three.js in a single-file HTML page — and how library injection avoids hard-coded script tags.",
+    publishedDate: "2026-05-15",
+    emoji: "📦",
+    tagline: "Libraries without leaving the single-file format.",
+  },
+  {
+    slug: "why-single-file-html-content-is-back",
+    title: "Why is single-file HTML content making a comeback?",
+    description:
+      "Single-file HTML — one document, no build step — is resurging alongside AI assistants. Here is why the format fits the moment.",
+    publishedDate: "2026-05-15",
+    emoji: "🔄",
+    tagline: "One file, no build step — and newly relevant.",
+  },
+  {
+    slug: "arcadelab-vs-codepen-for-games",
+    title: "ArcadeLab vs CodePen for games — which should I use?",
+    description:
+      "CodePen is a code playground; ArcadeLab is a publishing destination. How they differ for building and sharing browser games.",
+    publishedDate: "2026-05-15",
+    emoji: "🖊️",
+    tagline: "Playground vs. publishing destination.",
+  },
 ];
 
 export function getArticle(slug: string): ArticleMeta | undefined {

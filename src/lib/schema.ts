@@ -123,7 +123,7 @@ export function articleSchema(input: {
       name: "ArcadeLab",
       logo: {
         "@type": "ImageObject",
-        url: `${BASE_URL}/icon.png`,
+        url: `${BASE_URL}/opengraph-image`,
       },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": input.url },

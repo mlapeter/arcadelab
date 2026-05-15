@@ -13,6 +13,7 @@ export const metadata: Metadata = {
   description: meta.description,
   alternates: { canonical: "https://arcadelab.ai/d3" },
   openGraph: {
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
     title: `${meta.longName} on ArcadeLab`,
     description: meta.description,
     url: "https://arcadelab.ai/d3",

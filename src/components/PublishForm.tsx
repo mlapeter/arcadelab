@@ -38,7 +38,7 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
   const [loadingGame, setLoadingGame] = useState(!!updateSlug);
 
   // Remix
-  const [remixOf, setRemixOf] = useState(remixOfSlug || "");
+  const [remixOf] = useState(remixOfSlug || "");
   const [remixInfo, setRemixInfo] = useState<{ title: string; creator_name: string } | null>(null);
 
   // UI

@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   description: article.description,
   alternates: { canonical: `https://arcadelab.ai/learn/${article.slug}` },
   openGraph: {
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
     title: article.title,
     description: article.description,
     url: `https://arcadelab.ai/learn/${article.slug}`,

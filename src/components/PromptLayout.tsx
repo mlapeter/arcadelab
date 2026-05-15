@@ -53,7 +53,7 @@ export default function PromptLayout({ prompt, extraFaqs, children }: Props) {
       description: prompt.description,
       url,
       datePublished: prompt.publishedDate,
-      imageUrl: `https://arcadelab.ai/icon.png`,
+      imageUrl: `https://arcadelab.ai/opengraph-image`,
     }),
     howToSchema({
       name: prompt.title,

@@ -1,10 +1,58 @@
 import Link from "next/link";
 import JsonLd from "@/components/JsonLd";
+import GameCard from "@/components/GameCard";
+import { supabase } from "@/lib/supabase";
+import { getFeaturedGameSlugs } from "@/lib/seo/game-overrides";
 import {
   organizationSchema,
   websiteSchema,
   faqPageSchema,
 } from "@/lib/schema";
+
+/**
+ * Featured showcase games for the homepage. Slugs come from the curated
+ * overrides in game-overrides.ts (getFeaturedGameSlugs). We fetch the live
+ * rows so the cards show real titles, creators, and play counts — and
+ * preserve the override order so the section is stable, not random.
+ */
+async function getFeaturedGames() {
+  const slugs = getFeaturedGameSlugs();
+  if (slugs.length === 0) return [];
+
+  const { data: games } = await supabase
+    .from("games")
+    .select("id, slug, title, creator_id, play_count, like_count, emoji, color")
+    .in("slug", slugs)
+    .eq("status", "active");
+
+  if (!games || games.length === 0) return [];
+
+  const creatorIds = [...new Set(games.map((g) => g.creator_id).filter(Boolean))];
+  let creatorsMap: Record<string, string> = {};
+  if (creatorIds.length > 0) {
+    const { data: creators } = await supabase
+      .from("creators")
+      .select("id, display_name")
+      .in("id", creatorIds);
+    if (creators) {
+      creatorsMap = Object.fromEntries(creators.map((c) => [c.id, c.display_name]));
+    }
+  }
+
+  const order = new Map(slugs.map((s, i) => [s, i]));
+  return games
+    .map((g) => ({
+      id: g.id,
+      slug: g.slug,
+      title: g.title,
+      creator_name: creatorsMap[g.creator_id] || "Unknown",
+      play_count: g.play_count,
+      like_count: g.like_count,
+      emoji: g.emoji,
+      color: g.color,
+    }))
+    .sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0));
+}
 
 const HOMEPAGE_FAQS = [
   {
@@ -59,7 +107,9 @@ const HOMEPAGE_FAQS = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const featuredGames = await getFeaturedGames();
+
   return (
     <main className="relative min-h-[calc(100vh-56px)] flex flex-col items-center justify-center px-4 overflow-hidden">
       <JsonLd
@@ -218,6 +268,43 @@ color: blue
           🌈
         </span>
       </div>
+
+      {/* Featured showcase games */}
+      {featuredGames.length > 0 && (
+        <section
+          className="mt-14 mb-8 w-full max-w-5xl relative z-[1]"
+          aria-label="Featured games on ArcadeLab"
+        >
+          <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+            <h2 className="text-xs sm:text-sm text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
+              ✨ Featured
+            </h2>
+            <Link
+              href="/play"
+              className="text-[10px] text-parchment/70 hover:text-accent-gold transition-colors normal-case"
+            >
+              See all games →
+            </Link>
+          </div>
+          <p className="text-[10px] text-parchment/60 normal-case mb-5 leading-relaxed">
+            Hand-picked games, simulations, and interactive demos — each one a single HTML file.
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {featuredGames.map((game) => (
+              <GameCard
+                key={game.id}
+                slug={game.slug}
+                title={game.title}
+                creatorName={game.creator_name}
+                playCount={game.play_count}
+                likeCount={game.like_count}
+                emoji={game.emoji}
+                color={game.color}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Ground scene elements */}
       <div

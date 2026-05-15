@@ -45,12 +45,21 @@ export const metadata: Metadata = {
     title: "ArcadeLab — publish a single-file HTML game in one paste",
     description:
       "Paste a single HTML file. Get a shareable URL. Free, no signup, no build tools. Games, visualizations, and interactive content.",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "ArcadeLab — publish a single-file HTML game in one paste",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "ArcadeLab — publish a single-file HTML game in one paste",
     description:
       "Paste a single HTML file. Get a shareable URL. Free, no signup, no build tools.",
+    images: ["/opengraph-image"],
   },
 };
 

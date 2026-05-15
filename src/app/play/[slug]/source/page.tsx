@@ -4,6 +4,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { LIBRARY_MAP } from "@/lib/libraries";
 import CopyCodeButton from "@/components/CopyCodeButton";
+import JsonLd from "@/components/JsonLd";
+import { breadcrumbSchema } from "@/lib/schema";
 import type { Metadata } from "next";
 
 interface Props {
@@ -40,7 +42,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `Source: ${game.title}`,
-    description: `View the source code of ${game.title} by ${game.creator_name}`,
+    description: `View the full HTML source code of ${game.title} by ${game.creator_name} — a single-file HTML game on ArcadeLab. Copy it to study or remix.`,
+    alternates: { canonical: `https://arcadelab.ai/play/${game.slug}/source` },
   };
 }
 
@@ -58,8 +61,34 @@ export default async function SourcePage({ params }: Props) {
 
   const complexityEstimate = lineCount < 50 ? "simple" : lineCount < 200 ? "moderate" : "complex";
 
+  const gameUrl = `https://arcadelab.ai/play/${game.slug}`;
+  const sourceUrl = `${gameUrl}/source`;
+  const sourceSchema = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    name: `${game.title} — source code`,
+    description: `The full HTML source code of ${game.title} by ${game.creator_name} on ArcadeLab.`,
+    url: sourceUrl,
+    codeRepository: gameUrl,
+    programmingLanguage: "HTML",
+    runtimePlatform: "Web Browser",
+    isAccessibleForFree: true,
+    author: { "@type": "Person", name: game.creator_name },
+  };
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-8">
+      <JsonLd
+        data={[
+          sourceSchema,
+          breadcrumbSchema([
+            { name: "ArcadeLab", url: "https://arcadelab.ai/" },
+            { name: "Play", url: "https://arcadelab.ai/play" },
+            { name: game.title, url: gameUrl },
+            { name: "Source", url: sourceUrl },
+          ]),
+        ]}
+      />
       <div className="mb-4 flex items-baseline gap-3 flex-wrap">
         <h1 className="text-sm sm:text-base text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
           {game.title}

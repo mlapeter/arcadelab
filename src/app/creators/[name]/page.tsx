@@ -53,6 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: `${data.creator.display_name} publishes single-file HTML games and interactive things on ArcadeLab.`,
     alternates: { canonical: url },
     openGraph: {
+      images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
       title: `Games by ${data.creator.display_name}`,
       description: `${data.creator.display_name} on ArcadeLab — ${data.games.length} ${data.games.length === 1 ? "thing" : "things"} published.`,
       url,

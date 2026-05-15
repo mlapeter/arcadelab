@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   description: prompt.description,
   alternates: { canonical: `https://arcadelab.ai/prompts/${prompt.slug}` },
   openGraph: {
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
     title: prompt.title,
     description: prompt.description,
     url: `https://arcadelab.ai/prompts/${prompt.slug}`,

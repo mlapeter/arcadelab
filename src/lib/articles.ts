@@ -316,6 +316,51 @@ export const ARTICLES: ArticleMeta[] = [
     emoji: "🖊️",
     tagline: "Playground vs. publishing destination.",
   },
+  {
+    slug: "classroom-friendly-game-publishing",
+    title: "What is a classroom-friendly way to publish student games?",
+    description:
+      "A no-account, no-email way for students to publish browser games — safe for a classroom, simple enough for any age.",
+    publishedDate: "2026-05-15",
+    emoji: "🏫",
+    tagline: "Publishing that works for a whole class.",
+  },
+  {
+    slug: "homeschool-coding-projects-with-ai",
+    title: "What coding projects can homeschoolers do with AI?",
+    description:
+      "Browser game and visualization projects a homeschooler can build with an AI assistant and publish as a shareable link.",
+    publishedDate: "2026-05-15",
+    emoji: "🏡",
+    tagline: "Real projects, real links, at home.",
+  },
+  {
+    slug: "safe-game-sharing-for-kids",
+    title: "What is a safe way for kids to share games online?",
+    description:
+      "How kids can share browser games safely — no personal data, no accounts, sandboxed play, and what parents should know.",
+    publishedDate: "2026-05-15",
+    emoji: "🛟",
+    tagline: "Sharing games without the risky parts.",
+  },
+  {
+    slug: "what-is-an-llms-txt-file",
+    title: "What is an llms.txt file?",
+    description:
+      "llms.txt is a plain-text file that tells AI assistants what a website is and how to use it. Here is what it is and why sites add one.",
+    publishedDate: "2026-05-15",
+    emoji: "🤖",
+    tagline: "A README, but for AI assistants.",
+  },
+  {
+    slug: "building-ai-friendly-websites",
+    title: "How do I build an AI-friendly website?",
+    description:
+      "Practical ways to make a website legible to AI assistants and answer engines — structured data, clear content, llms.txt, and more.",
+    publishedDate: "2026-05-15",
+    emoji: "🧭",
+    tagline: "Make your site easy for AI to understand.",
+  },
 ];
 
 export function getArticle(slug: string): ArticleMeta | undefined {

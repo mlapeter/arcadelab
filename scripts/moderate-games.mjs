@@ -68,6 +68,9 @@ note: one short sentence explaining the verdict.
 IMPORTANT: a simple, silly, or unpolished game from a beginner is "safe" + "basic". Never label it "spam" or "broken". Reserve "scam"/"adult"/"spam" for content that is genuinely deceptive or harmful.`;
 
 const QUALITY_BASE = { good: 3, basic: 1, broken: -3 };
+// Mirrors src/lib/moderation.ts: a scam at/above this confidence is removed
+// and its creator banned; weaker verdicts are only hidden for review.
+const AUTO_REMOVE_CONFIDENCE = 0.85;
 
 /** Quality bucket + engagement → the /play ranking score. */
 function qualityScore(quality, playCount, likeCount) {
@@ -122,7 +125,7 @@ async function moderate(title, description, html) {
 // --- main ------------------------------------------------------------------
 let query = supabase
   .from("games")
-  .select("id, slug, title, description, play_count, like_count, status, moderation, game_content(html)")
+  .select("id, slug, title, description, creator_id, play_count, like_count, status, moderation, game_content(html)")
   .eq("status", "active");
 if (explicitSlugs.length) query = query.in("slug", explicitSlugs);
 
@@ -149,6 +152,7 @@ const todo =
 console.log(`Moderating ${todo.length} game(s)...`);
 
 let ok = 0;
+let removed = 0;
 let hidden = 0;
 let fail = 0;
 for (const g of todo) {
@@ -161,18 +165,36 @@ for (const g of todo) {
       moderation: { ...result, model: MODEL, checked_at: new Date().toISOString() },
       quality_score: score,
     };
-    if (result.verdict !== "safe") {
+    let tag = "✓";
+    if (result.verdict === "scam" && result.confidence >= AUTO_REMOVE_CONFIDENCE) {
+      // High-confidence scam: remove the game, ban the creator, hide their rest.
+      update.status = "removed";
+      update.flag_reason = "ai:scam";
+      await supabase.from("games").update(update).eq("id", g.id);
+      if (g.creator_id) {
+        await supabase.from("creators").update({ trust: "banned" }).eq("id", g.creator_id);
+        await supabase
+          .from("games")
+          .update({ status: "hidden", flag_reason: "creator-banned" })
+          .eq("creator_id", g.creator_id)
+          .eq("status", "active");
+      }
+      removed++;
+      tag = "⛔ REMOVED+BANNED";
+    } else if (result.verdict !== "safe") {
       update.status = "hidden";
       update.flag_reason = `ai:${result.verdict}`;
+      await supabase.from("games").update(update).eq("id", g.id);
       hidden++;
+      tag = "🚩 HIDDEN";
+    } else {
+      await supabase.from("games").update(update).eq("id", g.id);
     }
-    await supabase.from("games").update(update).eq("id", g.id);
     ok++;
-    const tag = result.verdict === "safe" ? "✓" : "🚩 HIDDEN";
     console.log(`  ${tag} ${g.slug} — ${result.verdict}/${result.quality} (score ${score})`);
   } catch (e) {
     fail++;
     console.log(`  ✗ ${g.slug} — ${e?.message || e}`);
   }
 }
-console.log(`Done. ${ok} moderated, ${hidden} hidden, ${fail} failed.`);
+console.log(`Done. ${ok} moderated, ${removed} removed, ${hidden} hidden, ${fail} failed.`);

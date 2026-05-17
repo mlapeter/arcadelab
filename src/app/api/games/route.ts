@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { authenticateCreator } from "@/lib/auth";
 import { generateSlug } from "@/lib/slug";
 import { scanGameContent, MAX_HTML_SIZE, MAX_TITLE_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/safety";
+import { moderateContent, applyModeration } from "@/lib/moderation";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
 import { VALID_COLORS, type GameColor } from "@/lib/parse-game";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -59,9 +60,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!rateLimit(getClientIp(request))) {
+  const clientIp = getClientIp(request);
+  if (!rateLimit(clientIp)) {
     return NextResponse.json({ error: "Too many requests — slow down!" }, { status: 429 });
   }
+
+  // Keyed hash of the submitter IP — a clustering signal for the admin queue,
+  // never a stored raw IP. Keyed with the service key so it can't be reversed
+  // from the public repo.
+  const ipHash = crypto
+    .createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY || "salt")
+    .update(clientIp)
+    .digest("hex");
 
   try {
     const creator = await authenticateCreator(
@@ -185,6 +195,7 @@ export async function POST(request: NextRequest) {
         emoji,
         color,
         forked_from: forkedFrom,
+        submit_ip_hash: ipHash,
       })
       .select("id, slug, title, description, created_at")
       .single();
@@ -215,6 +226,13 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // AI moderation runs after the response is sent — publishing stays
+    // instant. A non-"safe" verdict auto-shadow-hides the game for review.
+    after(async () => {
+      const result = await moderateContent({ title, description, html });
+      if (result) await applyModeration(game.id, result);
+    });
 
     return NextResponse.json(
       {

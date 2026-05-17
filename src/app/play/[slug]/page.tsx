@@ -9,6 +9,7 @@ import CreatorBadge from "@/components/CreatorBadge";
 import StarButton from "@/components/StarButton";
 import RemixButton from "@/components/RemixButton";
 import GameOwnerActions from "@/components/GameOwnerActions";
+import ReportButton from "@/components/ReportButton";
 import JsonLd from "@/components/JsonLd";
 import { gameSchema, breadcrumbSchema, learningResourceSchema, faqPageSchema } from "@/lib/schema";
 import { getGameOverride } from "@/lib/seo/game-overrides";
@@ -25,10 +26,12 @@ const getGame = cache(async function getGame(slug: string) {
     .from("games")
     .select("id, slug, title, description, creator_id, play_count, like_count, forked_from, libraries, status, created_at")
     .eq("slug", slug)
-    .eq("status", "active")
     .single();
 
-  if (!game) return null;
+  // 'hidden'/'pending' games still render at their URL (a creator's shared
+  // link never breaks); only 'removed' games 404. Non-active games are
+  // marked noindex in generateMetadata so they stay out of search.
+  if (!game || game.status === "removed") return null;
 
   const { data: creator } = await supabase
     .from("creators")
@@ -62,6 +65,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${game.title} by ${game.creator_name}`,
     description,
     keywords: override?.educationalTopics,
+    // Hidden/pending games stay reachable by link but must not be indexed.
+    robots: game.status === "active" ? undefined : { index: false, follow: false },
     alternates: { canonical: url },
     openGraph: {
       title: `${game.title} by ${game.creator_name}`,
@@ -235,6 +240,7 @@ export default async function PlayPage({ params }: Props) {
         </Link>
         <RemixButton gameId={game.id} gameTitle={game.title} gameSlug={game.slug} />
         <GameOwnerActions slug={game.slug} gameId={game.id} creatorId={game.creator_id} serverIsOwner={serverIsOwner} />
+        <ReportButton gameId={game.id} />
       </div>
 
       {/* Library badges */}

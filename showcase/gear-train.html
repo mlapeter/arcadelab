@@ -1,0 +1,673 @@
+<!--ARCADELAB
+title: Gear Train
+description: A hands-on machine of meshing gears — drag any gear to spin the whole train and watch how small gears whirl fast while big gears turn slow.
+emoji: ⚙️
+color: orange
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Gear Train</title>
+<style>
+  :root {
+    --bg: #1a1206;
+    --panel: rgba(48, 32, 12, 0.86);
+    --accent: #ffb24d;
+    --accent2: #ff7a3c;
+    --text: #fff3e0;
+    --muted: #e6c89a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(255, 178, 77, 0.32);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 178, 77, 0.36);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(74, 50, 18, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #ratio {
+    background: var(--panel);
+    border: 1px solid rgba(255, 178, 77, 0.3);
+    border-radius: 13px;
+    padding: 9px 16px;
+    font-size: clamp(13px, 3.7vw, 16px);
+    font-weight: 600;
+    color: var(--text);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #ratio b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(255, 178, 77, 0.2);
+    border-radius: 13px;
+    padding: 7px 13px;
+    font-size: clamp(12px, 3.3vw, 14px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #howPanel {
+    position: fixed;
+    left: 50%;
+    bottom: clamp(96px, 20vw, 120px);
+    transform: translateX(-50%) translateY(12px);
+    width: min(420px, 90vw);
+    background: var(--panel);
+    border: 1px solid rgba(255, 178, 77, 0.4);
+    border-radius: 16px;
+    padding: 16px 18px;
+    z-index: 6;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease, transform .22s ease;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  #howPanel.open { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  #howPanel h2 { margin: 0 0 8px; font-size: clamp(15px, 4vw, 18px); color: var(--accent); }
+  #howPanel p { margin: 6px 0; font-size: clamp(13px, 3.6vw, 15px); line-height: 1.5; color: var(--text); }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">⚙️</span><span>Gear Train</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="how" type="button">How it works</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+</div>
+
+<div id="howPanel">
+  <h2>How it works</h2>
+  <p>Gears with teeth lock together and push each other around.</p>
+  <p>Touching gears always spin in opposite directions.</p>
+  <p>A small gear has fewer teeth, so it must spin many more times to keep up with a big gear. That is a gear ratio!</p>
+</div>
+
+<div id="info">
+  <div id="ratio">Drag a gear to spin the train</div>
+  <div id="hint">Big gear turns slow · small gear turns fast</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var ratioEl = document.getElementById("ratio");
+
+  var W = 0, H = 0, DPR = 1;
+  var gears = [];
+
+  // momentum of the train (radians/sec of the reference driver gear)
+  var driverSpeed = 0;   // current angular speed applied to gears[0]
+  var TOOTH_MODULE = 0;  // pixels per tooth-pitch unit, computed on layout
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---- gear model ----
+  // Each gear: center (cx,cy), tooth count, angle, color.
+  // Pitch radius = teeth * module / 2.  Meshing gears share the same module.
+  function makeGear(teeth, color, label) {
+    return {
+      teeth: teeth,
+      cx: 0, cy: 0,
+      pitchR: 0,
+      angle: 0,
+      dir: 1,            // spin direction relative to driver (+1 / -1)
+      speedMul: 1,       // angular-speed multiplier vs driver
+      color: color,
+      label: label
+    };
+  }
+
+  function buildTrain() {
+    gears = [
+      makeGear(30, "#ff8c3c", "BIG"),
+      makeGear(18, "#ffd24d", "MID"),
+      makeGear(10, "#7fd0ff", "SMALL")
+    ];
+  }
+
+  // Lay the train out across the available space, sized to fit.
+  function layout() {
+    var big = gears[0], mid = gears[1], small = gears[2];
+    var TIP = 1.16; // outer (tooth-tip) radius / pitch radius
+
+    // module chosen so the whole chain — including tooth tips — fits on screen
+    var avail = Math.min(W * 0.94, W - 24);
+    // full visual span = bigOuter + d1 + d2 + smallOuter, in module units / 2
+    var spanCoef = (TIP * big.teeth + (big.teeth + mid.teeth) +
+                    (mid.teeth + small.teeth) + TIP * small.teeth) / 2;
+    var maxModule = avail / spanCoef;
+    var heightModule = (H * 0.58) / (big.teeth * TIP + 4);
+    TOOTH_MODULE = Math.max(2.2, Math.min(maxModule, heightModule));
+
+    for (var i = 0; i < gears.length; i++) {
+      gears[i].pitchR = gears[i].teeth * TOOTH_MODULE / 2;
+    }
+
+    var cy = H * 0.52;
+    // Distance between meshing gear centers = sum of their pitch radii.
+    var d1 = big.pitchR + mid.pitchR;
+    var d2 = mid.pitchR + small.pitchR;
+    var bigOuter = big.pitchR * TIP;
+    var smallOuter = small.pitchR * TIP;
+    var fullSpan = bigOuter + d1 + d2 + smallOuter;
+    var startX = (W - fullSpan) / 2 + bigOuter;
+
+    big.cx = startX;
+    big.cy = cy;
+    mid.cx = startX + d1;
+    mid.cy = cy;
+    small.cx = startX + d1 + d2;
+    small.cy = cy;
+
+    // keep gears on screen vertically if very short window
+    var maxR = bigOuter;
+    if (cy - maxR < 70) {
+      var shift = 70 - (cy - maxR);
+      big.cy += shift; mid.cy += shift; small.cy += shift;
+    }
+
+    // direction + speed multipliers (driver = big gear, index 0)
+    // meshed gear spins opposite, speed multiplied by teethDriver/teethDriven
+    big.dir = 1; big.speedMul = 1;
+    mid.dir = -1; mid.speedMul = big.teeth / mid.teeth;
+    small.dir = 1; small.speedMul = big.teeth / small.teeth;
+  }
+
+  // ---- physics / spin ----
+  // The whole train is rigid. We track one driver angle; others follow.
+  // Meshing constraint: surface speeds match at the pitch circle, so
+  // gearB.angularSpeed = gearA.angularSpeed * (teethA / teethB), opposite sign.
+  function applyTrain(driverAngle) {
+    gears[0].angle = driverAngle;
+    for (var i = 1; i < gears.length; i++) {
+      var g = gears[i];
+      // angle relative to driver. We add a phase offset so teeth visually
+      // interlock; the offset is baked once the train is laid out.
+      g.angle = driverAngle * (-g.dir * g.speedMul) + g.phase;
+    }
+  }
+
+  // Compute phase offsets so teeth mesh cleanly at the contact point.
+  function computePhases() {
+    gears[0].phase = 0;
+    gears[0].angle = 0;
+    for (var i = 1; i < gears.length; i++) {
+      var prev = gears[i - 1];
+      var g = gears[i];
+      // direction from this gear's center toward the previous (meshing) gear
+      var contactAng = Math.atan2(prev.cy - g.cy, prev.cx - g.cx);
+      var prevContactAng = Math.atan2(g.cy - prev.cy, g.cx - prev.cx);
+      // a tooth tip of prev at prevContactAng must align with a valley of g.
+      // Tooth angular pitch:
+      var pitchPrev = (Math.PI * 2) / prev.teeth;
+      var pitchG = (Math.PI * 2) / g.teeth;
+      // local tooth coordinate of prev at the contact direction
+      var prevLocal = prevContactAng - prev.angle;
+      // we want g to present a valley there. Solve g.angle.
+      // g.angle = driverAngle*(-dir*mul) + phase ; at driverAngle=0:
+      g.phase = 0;
+      g.angle = 0;
+      // current g local angle at contact
+      var gLocal = contactAng - g.angle;
+      // tooth fraction of prev at contact (0 = tooth center)
+      var prevFrac = prevLocal / pitchPrev;
+      // we want g's tooth fraction at contact to be offset by 0.5 (valley)
+      var wantGFrac = prevFrac + 0.5;
+      var curGFrac = gLocal / pitchG;
+      var deltaFrac = wantGFrac - curGFrac;
+      // rotating g by +deltaAngle changes gLocal by -deltaAngle => frac by -deltaAngle/pitch
+      // so deltaAngle = -deltaFrac * pitchG
+      g.phase = -deltaFrac * pitchG;
+      g.angle = g.phase;
+    }
+  }
+
+  // ---- input ----
+  var dragging = null;        // gear being dragged
+  var dragPointerId = null;
+  var lastPointerAng = 0;     // angle of pointer around dragged gear's center
+  var lastMoveTime = 0;
+  var pointerVel = 0;         // measured angular velocity of the dragged gear
+
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function gearAt(x, y) {
+    for (var i = 0; i < gears.length; i++) {
+      var g = gears[i];
+      var dx = x - g.cx, dy = y - g.cy;
+      var outer = g.pitchR + g.pitchR * 0.16;
+      if (dx * dx + dy * dy <= outer * outer) return g;
+    }
+    return null;
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (dragging) return;
+    var pt = pointFromEvent(e);
+    var g = gearAt(pt.x, pt.y);
+    if (!g) return;
+    dragging = g;
+    dragPointerId = e.pointerId;
+    lastPointerAng = Math.atan2(pt.y - g.cy, pt.x - g.cx);
+    lastMoveTime = performance.now();
+    pointerVel = 0;
+    driverSpeed = 0;
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    var g = dragging;
+    var ang = Math.atan2(pt.y - g.cy, pt.x - g.cx);
+    var delta = ang - lastPointerAng;
+    // normalize to [-pi, pi]
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    lastPointerAng = ang;
+
+    var now = performance.now();
+    var dt = Math.max(0.001, (now - lastMoveTime) / 1000);
+    lastMoveTime = now;
+
+    // The dragged gear rotates by `delta`. Convert that into driver rotation.
+    // dragged gear angle = driverAngle * (-dir*mul) + phase  (for i>0)
+    // for driver (i==0): angle = driverAngle.
+    var driverDelta;
+    if (g === gears[0]) {
+      driverDelta = delta;
+    } else {
+      driverDelta = delta / (-g.dir * g.speedMul);
+    }
+    driverAngle += driverDelta;
+    applyTrain(driverAngle);
+
+    // measured angular velocity of the driver (for momentum after release)
+    var instVel = driverDelta / dt;
+    pointerVel = pointerVel * 0.6 + instVel * 0.4;
+  });
+
+  function endDrag(e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    // give the train momentum based on the last drag speed
+    driverSpeed = Math.max(-14, Math.min(14, pointerVel));
+    dragging = null;
+    dragPointerId = null;
+  }
+
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", function (e) {
+    if (dragging && e.pointerId === dragPointerId) {
+      driverSpeed = Math.max(-14, Math.min(14, pointerVel));
+      dragging = null;
+      dragPointerId = null;
+    }
+  });
+
+  // ---- driver angle (master state) ----
+  var driverAngle = 0;
+
+  // ---- layout / resize ----
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    layout();
+    computePhases();
+    applyTrain(driverAngle);
+  }
+
+  // ---- gear drawing ----
+  function drawGear(g) {
+    var teeth = g.teeth;
+    var pr = g.pitchR;
+    var addendum = pr * (0.16 + 1.2 / teeth);   // tooth height outside pitch
+    var dedendum = pr * (0.16 + 1.0 / teeth);   // valley depth inside pitch
+    var outerR = pr + addendum;
+    var rootR = pr - dedendum;
+    var holeR = Math.max(pr * 0.16, 8);
+
+    ctx.save();
+    ctx.translate(g.cx, g.cy);
+
+    // soft shadow
+    ctx.save();
+    ctx.translate(3, 5);
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    drawGearPath(teeth, outerR, rootR, g.angle);
+    ctx.fill();
+    ctx.restore();
+
+    // gear body gradient
+    var grd = ctx.createRadialGradient(-outerR * 0.3, -outerR * 0.3, outerR * 0.1, 0, 0, outerR);
+    grd.addColorStop(0, lighten(g.color, 0.35));
+    grd.addColorStop(0.55, g.color);
+    grd.addColorStop(1, darken(g.color, 0.32));
+    ctx.fillStyle = grd;
+    drawGearPath(teeth, outerR, rootR, g.angle);
+    ctx.fill();
+
+    // tooth edge highlight
+    ctx.lineWidth = Math.max(1, pr * 0.025);
+    ctx.strokeStyle = darken(g.color, 0.45);
+    drawGearPath(teeth, outerR, rootR, g.angle);
+    ctx.stroke();
+
+    // inner rim ring
+    ctx.beginPath();
+    ctx.arc(0, 0, rootR * 0.78, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(1.5, pr * 0.05);
+    ctx.strokeStyle = darken(g.color, 0.25);
+    ctx.stroke();
+
+    // spoke marks so spin is visible
+    var spokeCount = 3;
+    ctx.save();
+    ctx.rotate(g.angle);
+    for (var s = 0; s < spokeCount; s++) {
+      ctx.save();
+      ctx.rotate((Math.PI * 2 / spokeCount) * s);
+      ctx.fillStyle = darken(g.color, 0.22);
+      ctx.beginPath();
+      ctx.moveTo(-pr * 0.07, holeR + 2);
+      ctx.lineTo(pr * 0.07, holeR + 2);
+      ctx.lineTo(pr * 0.045, rootR * 0.78 - 2);
+      ctx.lineTo(-pr * 0.045, rootR * 0.78 - 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // center hub
+    var hub = ctx.createRadialGradient(-holeR * 0.4, -holeR * 0.4, 0, 0, 0, holeR + 4);
+    hub.addColorStop(0, lighten(g.color, 0.3));
+    hub.addColorStop(1, darken(g.color, 0.4));
+    ctx.fillStyle = hub;
+    ctx.beginPath();
+    ctx.arc(0, 0, holeR + 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a1206";
+    ctx.beginPath();
+    ctx.arc(0, 0, holeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // bright colored marker dot near the rim — makes speed obvious
+    ctx.save();
+    ctx.rotate(g.angle);
+    var dotR = rootR * 0.55;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(dotR, 0, Math.max(4, pr * 0.13), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = markerColor(g);
+    ctx.beginPath();
+    ctx.arc(dotR, 0, Math.max(2.6, pr * 0.085), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+
+    // tooth-count label under the gear
+    ctx.fillStyle = "#fff3e0";
+    ctx.font = "700 " + Math.max(12, Math.min(20, pr * 0.32)) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(g.teeth + " teeth", g.cx, g.cy + outerR + 8);
+  }
+
+  function markerColor(g) {
+    if (g === gears[0]) return "#ff5a2c";
+    if (g === gears[1]) return "#d98a00";
+    return "#1463c4";
+  }
+
+  // Build a gear outline path with trapezoidal teeth.
+  function drawGearPath(teeth, outerR, rootR, rotation) {
+    ctx.beginPath();
+    var step = (Math.PI * 2) / teeth;
+    // each tooth: root-rise-tip-tip-fall-root, expressed as fractions of pitch
+    var toothTop = 0.30;   // fraction of pitch the tooth tip spans
+    var toothBot = 0.52;   // fraction of pitch the tooth base spans
+    for (var i = 0; i < teeth; i++) {
+      var a = rotation + i * step;
+      var aRootStart = a - step * (toothBot / 2);
+      var aTipStart  = a - step * (toothTop / 2);
+      var aTipEnd    = a + step * (toothTop / 2);
+      var aRootEnd   = a + step * (toothBot / 2);
+      var aValley    = a + step / 2;
+
+      pt(rootR, aRootStart, i === 0, true);
+      pt(outerR, aTipStart, false, false);
+      pt(outerR, aTipEnd, false, false);
+      pt(rootR, aRootEnd, false, false);
+      pt(rootR, aValley, false, false);
+    }
+    ctx.closePath();
+  }
+
+  function pt(r, ang, isFirst, moveOnly) {
+    var x = Math.cos(ang) * r;
+    var y = Math.sin(ang) * r;
+    if (isFirst) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+
+  // ---- color helpers ----
+  function hexToRgb(hex) {
+    var h = hex.replace("#", "");
+    return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+  }
+  function lighten(hex, amt) {
+    var c = hexToRgb(hex);
+    return "rgb(" + Math.min(255, Math.round(c[0] + (255 - c[0]) * amt)) + "," +
+                    Math.min(255, Math.round(c[1] + (255 - c[1]) * amt)) + "," +
+                    Math.min(255, Math.round(c[2] + (255 - c[2]) * amt)) + ")";
+  }
+  function darken(hex, amt) {
+    var c = hexToRgb(hex);
+    return "rgb(" + Math.round(c[0] * (1 - amt)) + "," +
+                    Math.round(c[1] * (1 - amt)) + "," +
+                    Math.round(c[2] * (1 - amt)) + ")";
+  }
+
+  // ---- render ----
+  function draw() {
+    // background
+    var bg = ctx.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.8);
+    bg.addColorStop(0, "#2a1c0a");
+    bg.addColorStop(1, "#140d04");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // subtle bolt-grid texture
+    ctx.fillStyle = "rgba(255,178,77,0.05)";
+    var gridGap = 54;
+    for (var gx = gridGap / 2; gx < W; gx += gridGap) {
+      for (var gy = gridGap / 2; gy < H; gy += gridGap) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // mounting pegs (axles) behind gears
+    for (var i = 0; i < gears.length; i++) {
+      var g = gears[i];
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      ctx.beginPath();
+      ctx.arc(g.cx, g.cy, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // draw big gears first so small ones sit on top at mesh points
+    for (var d = 0; d < gears.length; d++) {
+      drawGear(gears[d]);
+    }
+  }
+
+  // ---- ratio display ----
+  function updateRatio() {
+    var big = gears[0], small = gears[2];
+    var ratio = big.teeth / small.teeth;
+    var rounded = Math.round(ratio * 10) / 10;
+    ratioEl.innerHTML = "<b>1 : " + rounded + "</b> — the small gear spins " + rounded + "× faster";
+  }
+
+  // ---- main loop ----
+  var lastT = 0;
+  function frame(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+    lastT = t;
+
+    if (!dragging) {
+      // momentum + gentle friction
+      driverAngle += driverSpeed * dt;
+      driverSpeed *= Math.pow(0.55, dt); // friction
+      if (Math.abs(driverSpeed) < 0.02) driverSpeed = 0;
+      applyTrain(driverAngle);
+    }
+
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---- buttons ----
+  document.getElementById("reset").addEventListener("click", function () {
+    driverAngle = 0;
+    driverSpeed = 0;
+    dragging = null;
+    dragPointerId = null;
+    buildTrain();
+    layout();
+    computePhases();
+    applyTrain(driverAngle);
+    updateRatio();
+  });
+
+  var howBtn = document.getElementById("how");
+  var howPanel = document.getElementById("howPanel");
+  howBtn.addEventListener("click", function () {
+    howPanel.classList.toggle("open");
+  });
+  document.addEventListener("pointerdown", function (e) {
+    if (howPanel.classList.contains("open") &&
+        !howPanel.contains(e.target) && e.target !== howBtn) {
+      howPanel.classList.remove("open");
+    }
+  });
+
+  window.addEventListener("resize", resize);
+
+  // ---- boot ----
+  buildTrain();
+  resize();
+  updateRatio();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () { stage.classList.add("ready"); });
+})();
+</script>
+</body>
+</html>

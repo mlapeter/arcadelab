@@ -420,6 +420,38 @@ export const GAME_OVERRIDES: Record<string, GameSeoOverride> = {
     ],
     relatedPromptSlugs: ["make-a-game-for-my-kid"],
   },
+  "gear-train-arcadelab": {
+    longDescription:
+      "A hands-on gear simulation for young kids. Drag any of the three meshing gears and the whole train spins together — turn the big gear and the little one whirls around far faster. A colored marker on each gear makes the speed difference easy to see, and a live readout shows the gear ratio between the biggest and smallest gear. It's a playful first look at how gears trade speed for size in bikes, clocks, and machines.",
+    educationalTopics: [
+      "gears",
+      "gear ratio",
+      "simple machines",
+      "rotational speed",
+      "mechanical engineering",
+      "physics",
+    ],
+    learningResourceType: "Interactive Demo",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What is a gear ratio?",
+        answer:
+          "A gear ratio compares how fast two connected gears spin. If a big gear has 30 teeth and a small gear has 10 teeth, the ratio is 1:3 — the small gear spins three times for every one turn of the big gear. Counting teeth is the easiest way to predict the ratio.",
+      },
+      {
+        question: "Why does the small gear spin faster?",
+        answer:
+          "Meshing gears push each other tooth by tooth, so they move the same number of teeth past the contact point. A small gear has fewer teeth, so it must spin around more times to keep up with a big gear. Fewer teeth means more turns.",
+      },
+      {
+        question: "How do kids use this simulation?",
+        answer:
+          "Just drag any gear with a finger or mouse and the whole train turns. Watch the marker dots to compare speeds and read the gear ratio at the bottom. It works on tablets and phones with no setup.",
+      },
+    ],
+    featured: true,
+  },
 };
 
 export function getGameOverride(slug: string): GameSeoOverride | undefined {

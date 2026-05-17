@@ -65,13 +65,14 @@ export default async function AdminPage({ searchParams }: Props) {
   }
 
   // --- Authorized: build the queue --------------------------------------
-  // Games that are pending, hidden, or have outstanding reports.
+  // Games that are pending, hidden, reported, or auto-removed by the AI as a
+  // scam (the last so an owner can audit / reverse an auto-removal).
   const { data: games } = await supabase
     .from("games")
     .select(
       "id, slug, title, creator_id, status, report_count, flag_reason, moderation, thumbnail_url, created_at"
     )
-    .or("status.in.(pending,hidden),report_count.gt.0")
+    .or("status.in.(pending,hidden),report_count.gt.0,and(status.eq.removed,flag_reason.like.ai*)")
     .order("report_count", { ascending: false })
     .order("created_at", { ascending: false });
 
@@ -113,7 +114,8 @@ export default async function AdminPage({ searchParams }: Props) {
         <h1 className="text-[11px] text-wood-dark mb-1">Moderation queue</h1>
         <p className="text-[10px] text-wood-mid normal-case">
           {queue.length} game{queue.length === 1 ? "" : "s"} need a look —
-          pending checks, shadow-hidden, or reported by viewers.
+          pending checks, shadow-hidden, reported by viewers, or auto-removed
+          as scams. Approving a banned creator&apos;s game also un-bans them.
         </p>
       </div>
 

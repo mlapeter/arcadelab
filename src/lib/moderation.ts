@@ -126,10 +126,19 @@ function parseResult(text: string): ModerationResult | null {
 // (plays, likes) is layered on top by the rescore pass in moderate-games.mjs.
 const QUALITY_BASE: Record<string, number> = { good: 3, basic: 1, broken: -3 };
 
+// A scam at or above this confidence is removed outright and its creator
+// banned. Other non-safe verdicts (adult, spam, or a lower-confidence scam)
+// are only shadow-hidden for owner review — they are more false-positive-prone,
+// so a human makes the final call. An owner "approve" in /admin reverses both.
+const AUTO_REMOVE_CONFIDENCE = 0.85;
+
 /**
- * Records a moderation result on a game. A non-"safe" verdict auto-shadow-hides
- * the game (still playable by link, off all discovery) for owner review — but
- * only if it's currently 'active', so this never resurrects a removed game.
+ * Records a moderation result on a game and acts on the verdict:
+ *  - safe                    → nothing
+ *  - scam (high confidence)  → game removed, creator banned (auto)
+ *  - adult / spam / weak scam → game shadow-hidden for owner review
+ * Status changes only touch currently-discoverable games, so this never
+ * resurrects something already removed.
  */
 export async function applyModeration(gameId: string, result: ModerationResult) {
   await supabase
@@ -140,11 +149,43 @@ export async function applyModeration(gameId: string, result: ModerationResult) 
     })
     .eq("id", gameId);
 
-  if (result.verdict !== "safe") {
+  if (result.verdict === "safe") return;
+
+  if (result.verdict === "scam" && result.confidence >= AUTO_REMOVE_CONFIDENCE) {
+    await removeAndBan(gameId);
+    return;
+  }
+
+  await supabase
+    .from("games")
+    .update({ status: "hidden", flag_reason: `ai:${result.verdict}` })
+    .eq("id", gameId)
+    .eq("status", "active");
+}
+
+/** Removes a confirmed-scam game and bans its creator, hiding their other games. */
+async function removeAndBan(gameId: string) {
+  const { data: game } = await supabase
+    .from("games")
+    .select("creator_id")
+    .eq("id", gameId)
+    .single();
+
+  await supabase
+    .from("games")
+    .update({ status: "removed", flag_reason: "ai:scam" })
+    .eq("id", gameId)
+    .neq("status", "removed");
+
+  if (game?.creator_id) {
+    await supabase
+      .from("creators")
+      .update({ trust: "banned" })
+      .eq("id", game.creator_id);
     await supabase
       .from("games")
-      .update({ status: "hidden", flag_reason: `ai:${result.verdict}` })
-      .eq("id", gameId)
+      .update({ status: "hidden", flag_reason: "creator-banned" })
+      .eq("creator_id", game.creator_id)
       .eq("status", "active");
   }
 }

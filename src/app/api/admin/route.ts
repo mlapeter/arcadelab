@@ -39,11 +39,25 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case "approve": {
         if (!gameId) return badRequest("gameId required");
+        const { data: g } = await supabase
+          .from("games")
+          .select("creator_id")
+          .eq("id", gameId)
+          .single();
         await supabase
           .from("games")
           .update({ status: "active", flag_reason: null, report_count: 0 })
           .eq("id", gameId);
         await resolveReports(gameId);
+        // Approving a game from a banned creator vouches for them — un-ban,
+        // which reverses an auto-remove + auto-ban false positive in one click.
+        if (g?.creator_id) {
+          await supabase
+            .from("creators")
+            .update({ trust: "new" })
+            .eq("id", g.creator_id)
+            .eq("trust", "banned");
+        }
         return NextResponse.json({ success: true });
       }
       case "hide": {

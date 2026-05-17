@@ -1,0 +1,800 @@
+<!--ARCADELAB
+title: Magnet Playground
+description: Drag a bar magnet and watch its field lines bend — push another magnet around, spin a compass, and sprinkle iron filings that snap into the field.
+emoji: 🧲
+color: blue
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Magnet Playground</title>
+<style>
+  :root {
+    --bg: #07101f;
+    --panel: rgba(16, 30, 54, 0.86);
+    --accent: #5fb8ff;
+    --accent2: #7affd6;
+    --text: #e7f1ff;
+    --muted: #9fb7d6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(95, 184, 255, 0.32);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(95, 184, 255, 0.36);
+    border-radius: 13px;
+    padding: 11px 15px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(26, 46, 80, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  button.on { border-color: var(--accent2); color: var(--accent2); }
+
+  #help {
+    position: fixed;
+    left: clamp(10px, 2.4vw, 18px);
+    top: 64px;
+    z-index: 6;
+    max-width: min(340px, 88vw);
+  }
+  #helpPanel {
+    margin-top: 8px;
+    background: var(--panel);
+    border: 1px solid rgba(95, 184, 255, 0.3);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: clamp(13px, 3.5vw, 15px);
+    line-height: 1.5;
+    color: var(--text);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+  }
+  #helpPanel.open { display: block; }
+  #helpPanel p { margin: 6px 0; }
+
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: center;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(95, 184, 255, 0.22);
+    border-radius: 13px;
+    padding: 9px 15px;
+    font-size: clamp(12px, 3.4vw, 14px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🧲</span><span>Magnet Playground</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="filingsBtn" type="button" class="on">✨ Filings: On</button>
+    <button id="resetBtn" type="button">↺ Reset</button>
+  </div>
+</div>
+
+<div id="help">
+  <button id="helpBtn" type="button">❓ How it works</button>
+  <div id="helpPanel">
+    <p>🧲 Drag a magnet around. The glowing lines show its invisible magnetic field.</p>
+    <p>🔴 Red is the North pole, 🔵 blue is South. Opposite poles pull together, the same poles push apart.</p>
+    <p>🧭 The compass needle always turns to point along the field.</p>
+    <p>✨ The tiny iron filings line up with the field, just like real ones do!</p>
+  </div>
+</div>
+
+<div id="info">
+  <div id="hint">Drag a magnet · push the magnets together to feel them pull or push</div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var filingsBtn = document.getElementById("filingsBtn");
+  var resetBtn = document.getElementById("resetBtn");
+  var helpBtn = document.getElementById("helpBtn");
+  var helpPanel = document.getElementById("helpPanel");
+
+  var W = 0, H = 0, DPR = 1;
+  var showFilings = true;
+
+  // ---- magnet model ----
+  // Each magnet is a bar with a center (x,y) and an angle.
+  // length & width scale with the screen. It has two "poles":
+  // N at one end (+charge), S at the other (-charge).
+  function makeMagnet(x, y, angle) {
+    return {
+      x: x, y: y,
+      angle: angle,        // radians; 0 = horizontal, N on the right
+      vx: 0, vy: 0,        // velocity (for magnet 2 being pushed)
+      vAngle: 0,
+      length: 150,
+      width: 52,
+      strength: 9000,      // pole strength
+      held: false
+    };
+  }
+
+  var magnets = [];
+  var compass = { x: 0, y: 0, angle: 0 };
+  var filings = [];
+
+  function magnetScale() {
+    return Math.max(0.6, Math.min(1.25, Math.min(W, H) / 620));
+  }
+
+  function poleOf(m, sign) {
+    // sign +1 => North end, -1 => South end
+    var half = (m.length * 0.5) - m.width * 0.18;
+    return {
+      x: m.x + Math.cos(m.angle) * half * sign,
+      y: m.y + Math.sin(m.angle) * half * sign
+    };
+  }
+
+  function setupWorld() {
+    var sc = magnetScale();
+    var mLen = 160 * sc;
+    var m1, m2;
+    // if two magnets won't fit comfortably side-by-side, stack them
+    // vertically so they start clearly separated instead of snapping together.
+    // side-by-side needs the 0.3*W centre gap to exceed a magnet length + clearance.
+    if (0.3 * W < mLen + 90) {
+      m1 = makeMagnet(W * 0.62, H * 0.46, 0);
+      m2 = makeMagnet(W * 0.62, H * 0.70, 0);
+      compass.x = W * 0.28;
+      compass.y = H * 0.30;
+    } else {
+      m1 = makeMagnet(W * 0.36, H * 0.5, 0);
+      m2 = makeMagnet(W * 0.66, H * 0.5, 0);
+      compass.x = W * 0.5;
+      compass.y = H * 0.26;
+    }
+    m1.length = mLen; m1.width = 56 * sc;
+    m2.length = mLen; m2.width = 56 * sc;
+    magnets = [m1, m2];
+
+    compass.angle = 0;
+    buildFilings();
+  }
+
+  function buildFilings() {
+    filings = [];
+    var spacing = Math.max(34, Math.min(W, H) / 16);
+    for (var gx = spacing * 0.6; gx < W; gx += spacing) {
+      for (var gy = spacing * 0.6; gy < H; gy += spacing) {
+        // small jitter so it doesn't look like a rigid grid
+        filings.push({
+          x: gx + (Math.random() - 0.5) * spacing * 0.5,
+          y: gy + (Math.random() - 0.5) * spacing * 0.5,
+          angle: 0
+        });
+      }
+    }
+  }
+
+  // ---- field math ----
+  // Field from a single point pole (monopole approximation, sign = +/-).
+  // Returns {x, y} field vector contribution.
+  function poleField(px, py, x, y, charge) {
+    var dx = x - px;
+    var dy = y - py;
+    var d2 = dx * dx + dy * dy;
+    var soft = 220; // softening so it doesn't blow up near the pole
+    d2 += soft;
+    var d = Math.sqrt(d2);
+    var inv = charge / (d2 * d); // 1/r^2 falloff, direction = unit vector
+    return { x: dx * inv, y: dy * inv };
+  }
+
+  // Total field at (x,y) from all magnets. Each magnet = N pole + S pole.
+  function fieldAt(x, y, ignoreMagnet) {
+    var fx = 0, fy = 0;
+    for (var i = 0; i < magnets.length; i++) {
+      var m = magnets[i];
+      if (m === ignoreMagnet) continue;
+      var n = poleOf(m, 1);
+      var s = poleOf(m, -1);
+      var fn = poleField(n.x, n.y, x, y, m.strength);
+      var fs = poleField(s.x, s.y, x, y, -m.strength);
+      fx += fn.x + fs.x;
+      fy += fn.y + fs.y;
+    }
+    return { x: fx, y: fy };
+  }
+
+  // ---- layout ----
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    var first = (W === 0);
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (first) {
+      setupWorld();
+    } else {
+      // keep magnets on screen, rebuild filings for new size
+      for (var i = 0; i < magnets.length; i++) {
+        var m = magnets[i];
+        m.x = Math.max(40, Math.min(W - 40, m.x));
+        m.y = Math.max(80, Math.min(H - 80, m.y));
+      }
+      compass.x = Math.max(40, Math.min(W - 40, compass.x));
+      compass.y = Math.max(80, Math.min(H - 80, compass.y));
+      buildFilings();
+    }
+  }
+
+  // ---- input ----
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  // is (x,y) on this magnet's body? returns true within a generous box
+  function hitMagnet(m, x, y) {
+    var dx = x - m.x;
+    var dy = y - m.y;
+    var cos = Math.cos(-m.angle), sin = Math.sin(-m.angle);
+    var lx = dx * cos - dy * sin;
+    var ly = dx * sin + dy * cos;
+    var pad = 18; // generous tap target
+    return Math.abs(lx) <= m.length / 2 + pad && Math.abs(ly) <= m.width / 2 + pad;
+  }
+
+  function hitCompass(x, y) {
+    var dx = x - compass.x, dy = y - compass.y;
+    var r = compassRadius() + 16;
+    return dx * dx + dy * dy <= r * r;
+  }
+
+  function compassRadius() {
+    return Math.max(34, Math.min(W, H) / 13);
+  }
+
+  // active drags keyed by pointerId
+  var drags = {};
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    // check magnets first (topmost = last drawn = magnet[1]? draw order below)
+    for (var i = magnets.length - 1; i >= 0; i--) {
+      var m = magnets[i];
+      if (hitMagnet(m, pt.x, pt.y)) {
+        m.held = true;
+        m.vx = 0; m.vy = 0; m.vAngle = 0;
+        drags[e.pointerId] = {
+          type: "magnet", target: m,
+          offx: pt.x - m.x, offy: pt.y - m.y
+        };
+        capture(e.pointerId);
+        return;
+      }
+    }
+    if (hitCompass(pt.x, pt.y)) {
+      drags[e.pointerId] = {
+        type: "compass",
+        offx: pt.x - compass.x, offy: pt.y - compass.y
+      };
+      capture(e.pointerId);
+      return;
+    }
+  });
+
+  function capture(id) {
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(id); } catch (err) {}
+    }
+  }
+
+  canvas.addEventListener("pointermove", function (e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    if (d.type === "magnet") {
+      var m = d.target;
+      m.x = Math.max(30, Math.min(W - 30, pt.x - d.offx));
+      m.y = Math.max(70, Math.min(H - 30, pt.y - d.offy));
+    } else if (d.type === "compass") {
+      compass.x = Math.max(30, Math.min(W - 30, pt.x - d.offx));
+      compass.y = Math.max(70, Math.min(H - 30, pt.y - d.offy));
+    }
+  });
+
+  function endDrag(e) {
+    var d = drags[e.pointerId];
+    if (!d) return;
+    if (d.type === "magnet") {
+      d.target.held = false;
+    }
+    delete drags[e.pointerId];
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  // ---- buttons ----
+  filingsBtn.addEventListener("click", function () {
+    showFilings = !showFilings;
+    filingsBtn.textContent = showFilings ? "✨ Filings: On" : "✨ Filings: Off";
+    filingsBtn.classList.toggle("on", showFilings);
+  });
+  resetBtn.addEventListener("click", function () {
+    setupWorld();
+  });
+  helpBtn.addEventListener("click", function () {
+    helpPanel.classList.toggle("open");
+  });
+
+  // ---- physics: magnet-magnet interaction ----
+  // Magnet 2 (and any non-held magnet) gets pushed by forces between poles.
+  function stepPhysics(dt) {
+    for (var i = 0; i < magnets.length; i++) {
+      var m = magnets[i];
+      if (m.held) continue;
+
+      // compute force & torque from every OTHER magnet's poles on m's poles
+      var fx = 0, fy = 0, torque = 0;
+      var mPoles = [
+        { p: poleOf(m, 1), q: m.strength },
+        { p: poleOf(m, -1), q: -m.strength }
+      ];
+      for (var a = 0; a < mPoles.length; a++) {
+        var mp = mPoles[a];
+        var field = fieldAt(mp.p.x, mp.p.y, m); // field from others
+        // force on a pole = charge * field
+        var Fx = field.x * mp.q;
+        var Fy = field.y * mp.q;
+        fx += Fx;
+        fy += Fy;
+        // torque about magnet center
+        var rx = mp.p.x - m.x;
+        var ry = mp.p.y - m.y;
+        torque += rx * Fy - ry * Fx;
+      }
+
+      // scale forces to a comfortable visible motion
+      var fScale = 0.00045;
+      var tScale = 0.0000016;
+      m.vx += fx * fScale * dt;
+      m.vy += fy * fScale * dt;
+      m.vAngle += torque * tScale * dt;
+
+      // damping so motion settles
+      var damp = Math.pow(0.0008, dt);
+      m.vx *= damp;
+      m.vy *= damp;
+      m.vAngle *= Math.pow(0.0006, dt);
+
+      // clamp speeds
+      var maxV = 520;
+      var sp = Math.sqrt(m.vx * m.vx + m.vy * m.vy);
+      if (sp > maxV) { m.vx *= maxV / sp; m.vy *= maxV / sp; }
+      if (m.vAngle > 6) m.vAngle = 6;
+      if (m.vAngle < -6) m.vAngle = -6;
+
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.angle += m.vAngle * dt;
+
+      // bounce gently off walls
+      var pad = 30;
+      if (m.x < pad) { m.x = pad; m.vx = Math.abs(m.vx) * 0.4; }
+      if (m.x > W - pad) { m.x = W - pad; m.vx = -Math.abs(m.vx) * 0.4; }
+      if (m.y < 70) { m.y = 70; m.vy = Math.abs(m.vy) * 0.4; }
+      if (m.y > H - pad) { m.y = H - pad; m.vy = -Math.abs(m.vy) * 0.4; }
+    }
+
+    // compass needle turns toward local field
+    var cf = fieldAt(compass.x, compass.y, null);
+    var mag = Math.sqrt(cf.x * cf.x + cf.y * cf.y);
+    if (mag > 1e-7) {
+      var target = Math.atan2(cf.y, cf.x);
+      // shortest-angle interpolation
+      var diff = target - compass.angle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      compass.angle += diff * Math.min(1, dt * 9);
+    }
+
+    // iron filings align with the field at their spot
+    if (showFilings) {
+      for (var k = 0; k < filings.length; k++) {
+        var fl = filings[k];
+        var ff = fieldAt(fl.x, fl.y, null);
+        var fm = Math.sqrt(ff.x * ff.x + ff.y * ff.y);
+        if (fm > 1e-7) {
+          var ta = Math.atan2(ff.y, ff.x);
+          // filings have no N/S, so align to nearest of ta or ta+PI
+          var d1 = angleDiff(ta, fl.angle);
+          var d2 = angleDiff(ta + Math.PI, fl.angle);
+          var goal = (Math.abs(d1) <= Math.abs(d2)) ? ta : ta + Math.PI;
+          var gd = angleDiff(goal, fl.angle);
+          fl.angle += gd * Math.min(1, dt * 12);
+        }
+      }
+    }
+  }
+
+  function angleDiff(a, b) {
+    var d = a - b;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+
+  // ---- field line tracing ----
+  // Start near the N pole, step along the field until we reach an S pole
+  // or leave the screen.
+  function traceFieldLine(startX, startY, dir) {
+    var pts = [startX, startY];
+    var x = startX, y = startY;
+    var stepLen = 7;
+    var maxSteps = 460;
+    for (var i = 0; i < maxSteps; i++) {
+      var f = fieldAt(x, y, null);
+      var mag = Math.sqrt(f.x * f.x + f.y * f.y);
+      if (mag < 1e-9) break;
+      var nx = (f.x / mag) * stepLen * dir;
+      var ny = (f.y / mag) * stepLen * dir;
+      x += nx;
+      y += ny;
+      pts.push(x, y);
+      if (x < -60 || x > W + 60 || y < -60 || y > H + 60) break;
+      // stop if we got very close to any S pole
+      var done = false;
+      for (var j = 0; j < magnets.length; j++) {
+        var s = poleOf(magnets[j], -1);
+        var dx = x - s.x, dy = y - s.y;
+        if (dx * dx + dy * dy < 16 * 16) { done = true; break; }
+      }
+      if (done) break;
+    }
+    return pts;
+  }
+
+  // ---- drawing ----
+  function drawFieldLines() {
+    for (var i = 0; i < magnets.length; i++) {
+      var m = magnets[i];
+      var n = poleOf(m, 1);
+      var ringCount = 9;
+      var ringR = m.width * 0.42;
+      for (var r = 0; r < ringCount; r++) {
+        var a = (r / ringCount) * Math.PI * 2 + 0.2;
+        var sx = n.x + Math.cos(a) * ringR;
+        var sy = n.y + Math.sin(a) * ringR;
+        var line = traceFieldLine(sx, sy, 1);
+        strokeFieldLine(line);
+      }
+    }
+  }
+
+  function strokeFieldLine(pts) {
+    if (pts.length < 4) return;
+    ctx.beginPath();
+    ctx.moveTo(pts[0], pts[1]);
+    for (var i = 2; i < pts.length; i += 2) {
+      ctx.lineTo(pts[i], pts[i + 1]);
+    }
+    ctx.strokeStyle = "rgba(122, 200, 255, 0.5)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // little arrowheads along the line to show direction N -> S
+    var stepEvery = 18; // every N points
+    for (var k = stepEvery; k < pts.length / 2 - 2; k += stepEvery) {
+      var x = pts[k * 2], y = pts[k * 2 + 1];
+      var px = pts[(k - 1) * 2], py = pts[(k - 1) * 2 + 1];
+      var ang = Math.atan2(y - py, x - px);
+      var ah = 6;
+      ctx.fillStyle = "rgba(160, 220, 255, 0.85)";
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - ah * Math.cos(ang - 0.5), y - ah * Math.sin(ang - 0.5));
+      ctx.lineTo(x - ah * Math.cos(ang + 0.5), y - ah * Math.sin(ang + 0.5));
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function drawFilings() {
+    ctx.lineCap = "round";
+    for (var i = 0; i < filings.length; i++) {
+      var fl = filings[i];
+      var ff = fieldAt(fl.x, fl.y, null);
+      var fm = Math.sqrt(ff.x * ff.x + ff.y * ff.y);
+      // length & brightness scale a bit with field strength
+      var strength = Math.min(1, fm * 2600);
+      var len = 5 + strength * 9;
+      var alpha = 0.22 + strength * 0.62;
+      var cos = Math.cos(fl.angle), sin = Math.sin(fl.angle);
+      ctx.strokeStyle = "rgba(200, 224, 255, " + alpha.toFixed(3) + ")";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(fl.x - cos * len, fl.y - sin * len);
+      ctx.lineTo(fl.x + cos * len, fl.y + sin * len);
+      ctx.stroke();
+    }
+  }
+
+  function roundRectPath(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawMagnet(m) {
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.angle);
+    var L = m.length, Wd = m.width;
+    var r = Math.min(14, Wd * 0.3);
+
+    // shadow
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+
+    // South half (left, blue)
+    ctx.fillStyle = "#2f7be0";
+    roundRectPath(-L / 2, -Wd / 2, L / 2, Wd, r);
+    ctx.fill();
+    // North half (right, red)
+    ctx.fillStyle = "#e8453c";
+    roundRectPath(0, -Wd / 2, L / 2, Wd, r);
+    ctx.fill();
+
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // glossy highlight strip
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    roundRectPath(-L / 2 + 4, -Wd / 2 + 4, L - 8, Wd * 0.32, 6);
+    ctx.fill();
+
+    // pole letters
+    var fs = Math.round(Wd * 0.5);
+    ctx.fillStyle = "#fff";
+    ctx.font = "800 " + fs + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    // letters should stay upright-ish: counter-rotate text
+    drawUprightLetter("N", L / 4, 0, m.angle, fs);
+    drawUprightLetter("S", -L / 4, 0, m.angle, fs);
+
+    ctx.restore();
+  }
+
+  function drawUprightLetter(letter, lx, ly, magAngle, fs) {
+    ctx.save();
+    ctx.translate(lx, ly);
+    ctx.rotate(-magAngle); // undo magnet rotation so text reads upright
+    ctx.fillStyle = "#fff";
+    ctx.font = "800 " + fs + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(letter, 0, 1);
+    ctx.restore();
+  }
+
+  function drawCompass() {
+    var R = compassRadius();
+    ctx.save();
+    ctx.translate(compass.x, compass.y);
+
+    // body
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    ctx.fillStyle = "#f3f7ff";
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // rim
+    ctx.strokeStyle = "#c9b07a";
+    ctx.lineWidth = Math.max(4, R * 0.12);
+    ctx.beginPath();
+    ctx.arc(0, 0, R - ctx.lineWidth / 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // tick marks
+    ctx.strokeStyle = "rgba(60,80,110,0.55)";
+    ctx.lineWidth = 2;
+    for (var t = 0; t < 8; t++) {
+      var a = t / 8 * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * (R * 0.78), Math.sin(a) * (R * 0.78));
+      ctx.lineTo(Math.cos(a) * (R * 0.88), Math.sin(a) * (R * 0.88));
+      ctx.stroke();
+    }
+
+    // needle: points along compass.angle (toward field direction)
+    ctx.rotate(compass.angle);
+    var nl = R * 0.74;
+    // red half (points toward where field goes / "north-seeking" tip)
+    ctx.fillStyle = "#e8453c";
+    ctx.beginPath();
+    ctx.moveTo(nl, 0);
+    ctx.lineTo(-nl * 0.18, R * 0.16);
+    ctx.lineTo(-nl * 0.18, -R * 0.16);
+    ctx.closePath();
+    ctx.fill();
+    // blue half
+    ctx.fillStyle = "#2f7be0";
+    ctx.beginPath();
+    ctx.moveTo(-nl, 0);
+    ctx.lineTo(nl * 0.18, R * 0.16);
+    ctx.lineTo(nl * 0.18, -R * 0.16);
+    ctx.closePath();
+    ctx.fill();
+
+    // hub
+    ctx.fillStyle = "#3a3a3a";
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // ---- main loop ----
+  var lastTime = 0;
+  function frame(time) {
+    var dt = lastTime ? (time - lastTime) / 1000 : 0;
+    if (dt > 0.05) dt = 0.05;
+    lastTime = time;
+
+    // physics in a couple of substeps for stability
+    var sub = 3;
+    for (var s = 0; s < sub; s++) {
+      stepPhysics(dt / sub);
+    }
+
+    // background
+    var g = ctx.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.4, Math.max(W, H) * 0.9);
+    g.addColorStop(0, "#0e1d33");
+    g.addColorStop(1, "#060c18");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    if (showFilings) drawFilings();
+    drawFieldLines();
+
+    // pole glows
+    for (var i = 0; i < magnets.length; i++) {
+      var m = magnets[i];
+      var n = poleOf(m, 1);
+      var sp = poleOf(m, -1);
+      glow(n.x, n.y, m.width * 0.95, "rgba(255,90,80,0.5)");
+      glow(sp.x, sp.y, m.width * 0.95, "rgba(80,150,255,0.5)");
+    }
+
+    for (var k = 0; k < magnets.length; k++) {
+      drawMagnet(magnets[k]);
+    }
+    drawCompass();
+
+    requestAnimationFrame(frame);
+  }
+
+  function glow(x, y, r, color) {
+    var grd = ctx.createRadialGradient(x, y, 0, x, y, r);
+    grd.addColorStop(0, color);
+    grd.addColorStop(1, color.replace(/[\d.]+\)$/, "0)"));
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ---- boot ----
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () {
+    stage.classList.add("ready");
+  });
+})();
+</script>
+</body>
+</html>

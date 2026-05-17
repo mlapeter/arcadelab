@@ -1,0 +1,686 @@
+<!--ARCADELAB
+title: Pitch Lab
+description: Pluck a guitar string and watch it wobble while you hear the note — make it shorter or tighter for a higher pitch, longer or looser for a lower one.
+emoji: 🎸
+color: pink
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pitch Lab</title>
+<style>
+  :root {
+    --bg: #1a0a14;
+    --panel: rgba(48, 18, 36, 0.86);
+    --accent: #ff7ab8;
+    --accent2: #ffd166;
+    --text: #ffe9f3;
+    --muted: #e0a9c6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(255, 122, 184, 0.32);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 122, 184, 0.36);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(78, 30, 58, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+
+  /* control panel at bottom */
+  #panel {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: center;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #controls {
+    pointer-events: auto;
+    background: var(--panel);
+    border: 1px solid rgba(255, 122, 184, 0.26);
+    border-radius: 16px;
+    padding: 12px 16px 14px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    width: min(560px, 94vw);
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0;
+  }
+  .row .lbl {
+    width: 92px;
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: clamp(14px, 3.8vw, 16px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 44px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 12px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #ff7ab8, #ffd166);
+  }
+  input[type=range]::-moz-range-track {
+    height: 12px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #ff7ab8, #ffd166);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    margin-top: -9px;
+    border-radius: 50%;
+    background: #fff;
+    border: 4px solid #ff4f9e;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #fff;
+    border: 4px solid #ff4f9e;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .pitchbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+  }
+  .pitchbar .track {
+    flex: 1 1 auto;
+    height: 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+    position: relative;
+  }
+  .pitchbar .fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #6fd3ff, #ffd166, #ff7ab8);
+    width: 40%;
+    transition: width .12s ease;
+  }
+  #freq { font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums; }
+
+  /* how it works */
+  #help {
+    position: fixed;
+    left: clamp(10px, 2.4vw, 18px);
+    top: 64px;
+    z-index: 6;
+    max-width: min(340px, 88vw);
+  }
+  #helpPanel {
+    margin-top: 8px;
+    background: var(--panel);
+    border: 1px solid rgba(255, 122, 184, 0.3);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: clamp(13px, 3.5vw, 15px);
+    line-height: 1.5;
+    color: var(--text);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: none;
+  }
+  #helpPanel.open { display: block; }
+  #helpPanel p { margin: 6px 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🎸</span><span>Pitch Lab</span></div>
+  <div class="spacer"></div>
+</div>
+
+<div id="help">
+  <button id="helpBtn" type="button">❓ How it works</button>
+  <div id="helpPanel">
+    <p>🎸 Pull the string with your finger and let go to make it sing!</p>
+    <p>📏 A <b>shorter</b> string wobbles faster and sounds <b>higher</b>.</p>
+    <p>💪 More <b>tension</b> (a tighter string) also makes it higher.</p>
+    <p>The wiggle you see and the note you hear always match!</p>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="controls">
+    <div class="row">
+      <div class="lbl">📏 Length</div>
+      <input id="lenSlider" type="range" min="0" max="100" value="55" aria-label="String length">
+    </div>
+    <div class="row">
+      <div class="lbl">💪 Tension</div>
+      <input id="tenSlider" type="range" min="0" max="100" value="50" aria-label="String tension">
+    </div>
+    <div class="pitchbar">
+      <span>🔈 low</span>
+      <div class="track"><div id="pitchFill" class="fill"></div></div>
+      <span>high 🔊</span>
+      <span id="freq">220 Hz</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var lenSlider = document.getElementById("lenSlider");
+  var tenSlider = document.getElementById("tenSlider");
+  var freqEl = document.getElementById("freq");
+  var pitchFill = document.getElementById("pitchFill");
+  var helpBtn = document.getElementById("helpBtn");
+  var helpPanel = document.getElementById("helpPanel");
+
+  var W = 0, H = 0, DPR = 1;
+
+  // ---- string geometry ----
+  // The string spans horizontally. Left end is fixed; the playable span
+  // length depends on the LENGTH slider.
+  function stringRect() {
+    var margin = Math.min(W * 0.12, 90);
+    var maxSpan = W - margin * 2;
+    var lenFrac = 0.35 + (lenSlider.value / 100) * 0.65; // 0.35 .. 1.0
+    var span = maxSpan * lenFrac;
+    var x0 = margin;
+    var x1 = x0 + span;
+    var y = H * 0.5;
+    return { x0: x0, x1: x1, y: y, span: span };
+  }
+
+  // ---- pitch math ----
+  // Frequency rises when string is shorter and when tension is higher.
+  // f ~ (1/L) * sqrt(T)
+  function currentFrequency() {
+    var lenFrac = 0.35 + (lenSlider.value / 100) * 0.65; // 0.35..1.0
+    var tenNorm = tenSlider.value / 100;                  // 0..1
+    var tension = 0.25 + tenNorm * 1.75;                  // 0.25..2.0
+    var baseLen = 0.6; // reference
+    var f = 220 * (baseLen / lenFrac) * Math.sqrt(tension);
+    if (f < 70) f = 70;
+    if (f > 900) f = 900;
+    return f;
+  }
+
+  // map a frequency to 0..1 for the indicator (log scale, musical)
+  function freqToFrac(f) {
+    var lo = Math.log(70), hi = Math.log(900);
+    var t = (Math.log(f) - lo) / (hi - lo);
+    return Math.max(0, Math.min(1, t));
+  }
+
+  // ---- string vibration state ----
+  // amp: current pluck amplitude (pixels). decays over time.
+  // pluckPos: where along the string (0..1) it was plucked.
+  // phase: standing-wave oscillation phase.
+  var vib = {
+    amp: 0,
+    targetAmp: 0,
+    pluckPos: 0.5,
+    phase: 0,
+    sign: 1
+  };
+
+  // dragging the string
+  var dragging = false;
+  var dragPointerId = null;
+  var dragX = 0, dragY = 0;     // current finger pos
+  var dragGrabFrac = 0.5;       // where on the string grabbed
+
+  // ---- Web Audio (created lazily on first user gesture) ----
+  var audioCtx = null;
+  var osc = null;
+  var oscGain = null;
+  var audioReady = false;
+
+  function ensureAudio() {
+    if (audioReady) {
+      if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+      return;
+    }
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audioCtx = new AC();
+      oscGain = audioCtx.createGain();
+      oscGain.gain.value = 0;
+      osc = audioCtx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = currentFrequency();
+      // a soft lowpass to keep the tone gentle for kids
+      var filter = audioCtx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 2400;
+      osc.connect(filter);
+      filter.connect(oscGain);
+      oscGain.connect(audioCtx.destination);
+      osc.start();
+      audioReady = true;
+    } catch (err) {
+      audioReady = false;
+    }
+    if (audioCtx && audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  }
+
+  // play a note: set frequency, ramp gain up then down (a pluck envelope)
+  function playPluck(amp) {
+    ensureAudio();
+    if (!audioReady || !audioCtx) return;
+    var f = currentFrequency();
+    var now = audioCtx.currentTime;
+    var loud = Math.min(0.28, 0.06 + amp / 260 * 0.34);
+    try {
+      osc.frequency.cancelScheduledValues(now);
+      osc.frequency.setValueAtTime(f, now);
+      oscGain.gain.cancelScheduledValues(now);
+      oscGain.gain.setValueAtTime(oscGain.gain.value, now);
+      oscGain.gain.linearRampToValueAtTime(loud, now + 0.012);
+      oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.9);
+    } catch (err) {}
+  }
+
+  // keep the live tone tracking the sliders while a note rings
+  function updateLiveFrequency() {
+    if (!audioReady || !audioCtx || !osc) return;
+    try {
+      var now = audioCtx.currentTime;
+      osc.frequency.setTargetAtTime(currentFrequency(), now, 0.03);
+    } catch (err) {}
+  }
+
+  // ---- layout ----
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  // ---- input ----
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  // distance from a point to the resting string line; returns frac along it
+  function nearString(x, y) {
+    var s = stringRect();
+    if (x < s.x0 - 40 || x > s.x1 + 40) return -1;
+    var dy = Math.abs(y - s.y);
+    var grabBand = 70; // generous tap target
+    if (dy > grabBand) return -1;
+    var frac = (x - s.x0) / s.span;
+    return Math.max(0, Math.min(1, frac));
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    ensureAudio();
+    if (dragging) return;
+    var pt = pointFromEvent(e);
+    var frac = nearString(pt.x, pt.y);
+    if (frac < 0) return;
+    dragging = true;
+    dragPointerId = e.pointerId;
+    dragGrabFrac = frac;
+    dragX = pt.x;
+    dragY = pt.y;
+    vib.amp = 0;
+    vib.targetAmp = 0;
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    dragX = pt.x;
+    dragY = pt.y;
+  });
+
+  function releaseString(e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    dragging = false;
+    dragPointerId = null;
+    var s = stringRect();
+    var pull = dragY - s.y;
+    var amp = Math.abs(pull);
+    if (amp < 4) {
+      // a tap counts as a small gentle pluck
+      amp = 26;
+    }
+    amp = Math.min(amp, 150);
+    vib.amp = amp;
+    vib.pluckPos = dragGrabFrac;
+    vib.phase = 0;
+    vib.sign = (pull >= 0) ? 1 : -1;
+    playPluck(amp);
+  }
+
+  canvas.addEventListener("pointerup", releaseString);
+  canvas.addEventListener("pointercancel", function (e) {
+    if (dragging && e.pointerId === dragPointerId) {
+      dragging = false;
+      dragPointerId = null;
+    }
+  });
+
+  // sliders
+  function onSliderChange() {
+    updateLiveFrequency();
+    updateFreqReadout();
+  }
+  lenSlider.addEventListener("input", onSliderChange);
+  tenSlider.addEventListener("input", onSliderChange);
+
+  function updateFreqReadout() {
+    var f = currentFrequency();
+    freqEl.textContent = Math.round(f) + " Hz";
+    pitchFill.style.width = (8 + freqToFrac(f) * 92) + "%";
+  }
+
+  helpBtn.addEventListener("click", function () {
+    helpPanel.classList.toggle("open");
+  });
+
+  // ---- drawing ----
+  // The vibration frequency we DRAW must visually match the pitch we HEAR.
+  // We scale audio Hz down to a comfortable visible wobble rate.
+  function visibleWobbleRate(f) {
+    // returns radians/sec for the standing-wave oscillation
+    return (f / 220) * 9.0; // 220Hz -> 9 rad/s wobble
+  }
+
+  // string displacement at fraction u (0..1) for a given time
+  function stringOffset(u, time) {
+    var s = stringRect();
+    if (dragging) {
+      // pull shape: triangle peak at the grabbed fraction
+      var peak = dragY - s.y;
+      var g = dragGrabFrac;
+      var shape;
+      if (u <= g) {
+        shape = (g <= 0) ? 0 : u / g;
+      } else {
+        shape = (g >= 1) ? 0 : (1 - u) / (1 - g);
+      }
+      return peak * shape;
+    }
+    if (vib.amp <= 0.4) return 0;
+    // standing wave: half-sine envelope, oscillating in time
+    var envelope = Math.sin(Math.PI * u);
+    var wob = Math.cos(vib.phase);
+    return vib.sign * vib.amp * envelope * wob;
+  }
+
+  var lastTime = 0;
+
+  function draw(time) {
+    var dt = lastTime ? (time - lastTime) / 1000 : 0;
+    if (dt > 0.05) dt = 0.05;
+    lastTime = time;
+
+    var f = currentFrequency();
+
+    // advance vibration
+    if (!dragging && vib.amp > 0.4) {
+      vib.phase += visibleWobbleRate(f) * dt;
+      // decay — higher notes fade a touch faster, like a real string
+      var decay = Math.exp(-dt * (0.9 + f / 1400));
+      vib.amp *= decay;
+      if (vib.amp < 0.4) vib.amp = 0;
+    }
+
+    // background
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#2a0e20");
+    g.addColorStop(0.55, "#1a0a14");
+    g.addColorStop(1, "#120710");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    var s = stringRect();
+
+    // soft glow band behind the string, brighter when louder/higher
+    var live = Math.max(vib.amp, dragging ? Math.abs(dragY - s.y) : 0);
+    var glowA = 0.10 + Math.min(0.4, live / 220) + freqToFrac(f) * 0.12;
+    var bandH = 120;
+    var bg = ctx.createLinearGradient(0, s.y - bandH, 0, s.y + bandH);
+    bg.addColorStop(0, "rgba(255,122,184,0)");
+    bg.addColorStop(0.5, "rgba(255,122,184," + glowA.toFixed(3) + ")");
+    bg.addColorStop(1, "rgba(255,122,184,0)");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, s.y - bandH, W, bandH * 2);
+
+    // pegs / posts at each end
+    drawPost(s.x0, s.y);
+    drawPost(s.x1, s.y);
+
+    // the string itself — sampled curve
+    var samples = 90;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // outer glow stroke
+    ctx.beginPath();
+    for (var i = 0; i <= samples; i++) {
+      var u = i / samples;
+      var off = stringOffset(u, time);
+      var x = s.x0 + u * s.span;
+      var y = s.y + off;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "rgba(255,209,102,0.35)";
+    ctx.lineWidth = 11;
+    ctx.stroke();
+
+    // main string
+    ctx.beginPath();
+    for (var j = 0; j <= samples; j++) {
+      var u2 = j / samples;
+      var off2 = stringOffset(u2, time);
+      var x2 = s.x0 + u2 * s.span;
+      var y2 = s.y + off2;
+      if (j === 0) ctx.moveTo(x2, y2); else ctx.lineTo(x2, y2);
+    }
+    var strGrad = ctx.createLinearGradient(s.x0, 0, s.x1, 0);
+    strGrad.addColorStop(0, "#fff3c4");
+    strGrad.addColorStop(0.5, "#ffe28a");
+    strGrad.addColorStop(1, "#fff3c4");
+    ctx.strokeStyle = strGrad;
+    ctx.lineWidth = 5;
+    ctx.stroke();
+
+    // motion ghost trails when vibrating fast — draw faint extra strokes
+    if (!dragging && vib.amp > 1.5) {
+      for (var t = 1; t <= 2; t++) {
+        var ghostPhase = vib.phase - t * 0.55;
+        ctx.beginPath();
+        for (var k = 0; k <= samples; k++) {
+          var u3 = k / samples;
+          var envelope = Math.sin(Math.PI * u3);
+          var off3 = vib.sign * vib.amp * envelope * Math.cos(ghostPhase);
+          var x3 = s.x0 + u3 * s.span;
+          var y3 = s.y + off3;
+          if (k === 0) ctx.moveTo(x3, y3); else ctx.lineTo(x3, y3);
+        }
+        ctx.strokeStyle = "rgba(255,226,138," + (0.16 / t).toFixed(3) + ")";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+    }
+
+    // finger grab dot while dragging
+    if (dragging) {
+      var gx = s.x0 + dragGrabFrac * s.span;
+      var gy = s.y + (dragY - s.y);
+      var pg = ctx.createRadialGradient(gx, gy, 0, gx, gy, 26);
+      pg.addColorStop(0, "rgba(255,255,255,0.95)");
+      pg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#ff4f9e";
+      ctx.beginPath();
+      ctx.arc(gx, gy, 9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // instruction text when idle and quiet
+    if (!dragging && vib.amp < 0.5) {
+      ctx.fillStyle = "rgba(255,233,243,0.78)";
+      ctx.font = "600 " + Math.round(Math.min(W * 0.045, 22)) + "px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Pull the string and let go!", W / 2, s.y - 86);
+      // little hint arrows
+      ctx.fillStyle = "rgba(255,209,102,0.85)";
+      ctx.font = "600 26px system-ui, sans-serif";
+      ctx.fillText("👆", W / 2, s.y - 44);
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  function drawPost(x, y) {
+    // a chunky rounded post
+    var w = 18, h = 86;
+    ctx.fillStyle = "#7a2a4c";
+    roundRect(x - w / 2, y - h / 2, w, h, 8);
+    ctx.fill();
+    // knob
+    ctx.fillStyle = "#ff7ab8";
+    ctx.beginPath();
+    ctx.arc(x, y, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath();
+    ctx.arc(x - 4, y - 4, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---- boot ----
+  window.addEventListener("resize", resize);
+  resize();
+  updateFreqReadout();
+  requestAnimationFrame(draw);
+  requestAnimationFrame(function () {
+    stage.classList.add("ready");
+  });
+})();
+</script>
+</body>
+</html>

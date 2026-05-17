@@ -484,6 +484,262 @@ export const GAME_OVERRIDES: Record<string, GameSeoOverride> = {
     ],
     featured: true,
   },
+  "pulley-lifter-arcadelab": {
+    longDescription:
+      "A pulley sandbox that lets kids feel mechanical advantage. Thread the rope through 1, 2, or 3 pulleys, then drag the rope handle to hoist a heavy crate. With one pulley the pull is hard; add pulleys and the pull gets easier — but you have to pull that much more rope. Live effort and rope-length meters make the trade-off obvious: pulleys don't create free energy, they swap a long easy pull for a short hard one.",
+    educationalTopics: [
+      "pulleys",
+      "mechanical advantage",
+      "simple machines",
+      "force and effort",
+      "work and energy",
+      "physics",
+    ],
+    learningResourceType: "Simulation",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "How does a pulley make lifting easier?",
+        answer:
+          "A pulley system shares the weight of a load across several strands of rope. With two supporting strands you only pull half the weight, with three strands a third. The catch is that you must pull the rope two or three times as far.",
+      },
+      {
+        question: "What is mechanical advantage?",
+        answer:
+          "Mechanical advantage is how much a machine multiplies your force. A 3-pulley system has a mechanical advantage of about 3 — you push with one-third the force, but over three times the distance. Total work stays the same.",
+      },
+      {
+        question: "Why do you pull more rope with more pulleys?",
+        answer:
+          "Energy is conserved. Lifting a crate one meter takes the same amount of work no matter what. If the machine cuts your force to a third, it has to make up for it by having you pull three times as much rope.",
+      },
+    ],
+    featured: true,
+  },
+  "spacetime-sheet-arcadelab": {
+    longDescription:
+      "A playful model of how gravity works in Einstein's general relativity. A heavy mass sits in the middle of a stretchy grid and dents it into a deep well — the bigger the mass, the deeper the dip. Flick marbles across the sheet and watch them curve, loop into orbits, or spiral inward. Gravity here isn't a pull; it's marbles rolling along curved space. The classic rubber-sheet picture made interactive.",
+    educationalTopics: [
+      "gravity",
+      "general relativity",
+      "curved spacetime",
+      "orbits",
+      "mass and space",
+      "physics",
+    ],
+    learningResourceType: "Simulation",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What is the spacetime sheet model?",
+        answer:
+          "It is a way to picture gravity. Imagine space as a stretchy sheet. A heavy object like a star dents the sheet, and anything moving nearby rolls along the curve. Planets orbit because they are following the bent shape of space around a star.",
+      },
+      {
+        question: "Why do the marbles orbit instead of falling straight in?",
+        answer:
+          "A marble with sideways speed keeps moving forward as it also rolls toward the dip. Those two motions combine into a curved path that loops around the mass — an orbit. Too slow and it spirals in; just right and it circles.",
+      },
+      {
+        question: "Does a bigger mass really bend space more?",
+        answer:
+          "Yes. In the simulation a bigger mass makes a deeper well, and in real space more massive objects curve spacetime more strongly. That stronger curve is why heavy stars hold planets in tighter, faster orbits.",
+      },
+    ],
+    featured: true,
+  },
+  "moon-phases-orrery-arcadelab": {
+    longDescription:
+      "A hands-on orrery that finally makes Moon phases click. The Sun lights one side of everything; drag the Moon around its orbit and an inset shows exactly what the Moon looks like from Earth — new, crescent, quarter, gibbous, or full. Day and night sweep across Earth at the same time. Kids discover that phases aren't shadows of the Earth, just our changing view of the Moon's sunlit half.",
+    educationalTopics: [
+      "moon phases",
+      "orbits",
+      "the solar system",
+      "day and night",
+      "astronomy",
+      "space science",
+    ],
+    learningResourceType: "Interactive Demo",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What causes the phases of the Moon?",
+        answer:
+          "The Sun always lights up one half of the Moon. As the Moon orbits Earth, we see different amounts of that lit half — sometimes all of it (full moon), sometimes none (new moon), and crescents and quarters in between.",
+      },
+      {
+        question: "Are moon phases caused by Earth's shadow?",
+        answer:
+          "No — that is a common mix-up. Earth's shadow only touches the Moon during a lunar eclipse. Ordinary phases happen because we are viewing the Moon's sunlit side from different angles as it orbits.",
+      },
+      {
+        question: "How long does it take the Moon to go through all its phases?",
+        answer:
+          "About 29.5 days. That full cycle from one new moon to the next is where the idea of a month comes from.",
+      },
+    ],
+    featured: true,
+  },
+  "states-of-matter-arcadelab": {
+    longDescription:
+      "A box of particles that shows why ice, water, and steam are the same stuff. Slide from cold to hot and watch a locked, vibrating solid loosen into a flowing liquid and then break apart into a free-flying gas — and cool it back down to reverse every step. The particles move faster and glow warmer as the temperature climbs, making the link between heat, particle speed, and state of matter clear and tangible.",
+    educationalTopics: [
+      "states of matter",
+      "solids liquids and gases",
+      "melting and boiling",
+      "heat and temperature",
+      "particle motion",
+      "chemistry",
+    ],
+    learningResourceType: "Simulation",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What are the three states of matter shown here?",
+        answer:
+          "Solid, liquid, and gas. In a solid the particles are locked in a neat pattern and only vibrate. In a liquid they slide past each other and flow. In a gas they fly freely and spread out to fill the space.",
+      },
+      {
+        question: "How does heat change the state of matter?",
+        answer:
+          "Heat gives particles energy to move faster. Enough heat lets a solid's particles break free and flow as a liquid, and even more heat lets them escape into a gas. Cooling takes energy away and the changes reverse.",
+      },
+      {
+        question: "Is it the same material in all three states?",
+        answer:
+          "Yes. Ice, liquid water, and steam are all water — the same particles, just moving at different speeds. Changing state does not change what the substance is made of.",
+      },
+    ],
+    featured: true,
+  },
+  "simple-circuit-arcadelab": {
+    longDescription:
+      "A friendly electric circuit kids can switch on and off. Tap the switch to close the loop and the bulb lights up while glowing dots show current flowing from the battery. Toggle between a series circuit and a parallel circuit with two bulbs and watch the brightness change — series bulbs share the push and shine dimmer, parallel bulbs each get the full push and shine bright. A clear first look at how electricity flows.",
+    educationalTopics: [
+      "electric circuits",
+      "electricity",
+      "series and parallel circuits",
+      "current and switches",
+      "energy",
+      "physics",
+    ],
+    learningResourceType: "Interactive Demo",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What makes a circuit light a bulb?",
+        answer:
+          "A bulb lights when there is a complete, unbroken loop from the battery, through the wires and bulb, and back. The switch is a gap in that loop — close it and current flows, open it and the bulb goes dark.",
+      },
+      {
+        question: "What is the difference between series and parallel circuits?",
+        answer:
+          "In a series circuit the bulbs sit on one single loop and share the battery's push, so each shines dimmer. In a parallel circuit each bulb has its own loop to the battery, so each gets the full push and shines bright.",
+      },
+      {
+        question: "What are the moving dots in the simulation?",
+        answer:
+          "The dots represent electric current — the flow of charge around the circuit. They move only when the circuit is complete, which helps kids see that electricity needs a closed path.",
+      },
+    ],
+    featured: true,
+  },
+  "wave-tank-arcadelab": {
+    longDescription:
+      "A water tank for exploring how waves behave. Tap the surface to send circular ripples spreading outward, then switch on a second source and watch two sets of waves cross. Where crests meet they pile up into bright bands; where a crest meets a trough they cancel into calm dark bands. That pattern — interference — is how scientists understand sound, light, and every other kind of wave.",
+    educationalTopics: [
+      "waves",
+      "ripples",
+      "wave interference",
+      "constructive and destructive interference",
+      "sound and light",
+      "physics",
+    ],
+    learningResourceType: "Simulation",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What is wave interference?",
+        answer:
+          "Interference is what happens when two waves overlap. Where two crests meet they add up into a bigger wave (constructive interference). Where a crest meets a trough they cancel out into stillness (destructive interference).",
+      },
+      {
+        question: "Why do bright and dark bands appear with two sources?",
+        answer:
+          "Each point in the tank is a different distance from the two sources. At some spots the waves always arrive in step and reinforce — bright bands. At others they arrive out of step and cancel — dark bands.",
+      },
+      {
+        question: "Do real waves do this too?",
+        answer:
+          "Yes. Water, sound, and light waves all interfere the same way. The interference of light is what creates the colorful patterns you see in soap bubbles and on CDs.",
+      },
+    ],
+    featured: true,
+  },
+  "pitch-lab-arcadelab": {
+    longDescription:
+      "A pluckable string that lets kids see and hear pitch at the same time. Pluck it and the string vibrates with a visible wobble while a tone plays. Slide the length and tension controls: a shorter or tighter string vibrates faster, wobbles quicker, and sounds higher; a longer or looser string is slower and lower. The motion you watch and the note you hear always match — the secret behind every guitar, piano, and violin.",
+    educationalTopics: [
+      "sound",
+      "pitch and frequency",
+      "vibration",
+      "musical instruments",
+      "waves",
+      "physics of music",
+    ],
+    learningResourceType: "Interactive Demo",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What makes a sound high or low?",
+        answer:
+          "Pitch depends on how fast something vibrates. Fast vibrations make a high sound; slow vibrations make a low sound. The number of vibrations each second is called the frequency.",
+      },
+      {
+        question: "How do length and tension change the pitch?",
+        answer:
+          "A shorter string or a tighter (higher-tension) string vibrates faster, so the pitch goes up. A longer or looser string vibrates slower, so the pitch goes down. Instruments are tuned by adjusting exactly these things.",
+      },
+      {
+        question: "Why does the audio only start after I tap?",
+        answer:
+          "Web browsers block sound until you interact with the page, to stop sites from playing noise on their own. Tapping or plucking the string is what switches the audio on.",
+      },
+    ],
+    featured: true,
+  },
+  "magnet-playground-arcadelab": {
+    longDescription:
+      "A magnet sandbox that makes invisible forces visible. Drag a bar magnet and its field lines bend and flow with it, curving from the north pole to the south pole. Bring a second magnet close to feel poles attract and repel, watch a compass needle swing to point along the field, and sprinkle iron filings that snap into the field's shape. A tactile introduction to magnetism and magnetic fields.",
+    educationalTopics: [
+      "magnetism",
+      "magnetic fields",
+      "magnetic poles",
+      "attraction and repulsion",
+      "compasses",
+      "physics",
+    ],
+    learningResourceType: "Simulation",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "What are magnetic field lines?",
+        answer:
+          "Field lines are a way to draw the invisible magnetic force around a magnet. They flow out of the north pole and curve back into the south pole. Where the lines are crowded, the magnet is strongest.",
+      },
+      {
+        question: "Why do magnets attract and repel?",
+        answer:
+          "Every magnet has a north and a south pole. Opposite poles (north and south) pull toward each other, while like poles (north and north, or south and south) push apart.",
+      },
+      {
+        question: "How does a compass work?",
+        answer:
+          "A compass needle is a tiny magnet that is free to spin. It turns until it lines up with the magnetic field around it — which is why a compass points along Earth's own magnetic field toward the poles.",
+      },
+    ],
+    featured: true,
+  },
 };
 
 export function getGameOverride(slug: string): GameSeoOverride | undefined {

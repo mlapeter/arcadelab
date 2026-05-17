@@ -1,0 +1,817 @@
+<!--ARCADELAB
+title: Simple Circuit
+description: A tap-to-light circuit lab — flip the switch to glow the bulb, watch current zip along the wires, and compare series vs. parallel.
+emoji: 💡
+color: gold
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Simple Circuit</title>
+<style>
+  :root {
+    --bg: #0e0c06;
+    --panel: rgba(38, 31, 12, 0.86);
+    --accent: #ffd24a;
+    --accent2: #ffb03a;
+    --text: #fff6df;
+    --muted: #d8c98f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    letter-spacing: 0.2px;
+    background: var(--panel);
+    border: 1px solid rgba(255, 210, 74, 0.30);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(14px, 3.6vw, 16px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 210, 74, 0.34);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 46px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(60, 49, 18, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  button.on {
+    background: linear-gradient(180deg, #ffd24a, #ffab2e);
+    color: #2a1f04;
+    border-color: #ffe79a;
+  }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(255, 210, 74, 0.24);
+    border-radius: 13px;
+    padding: 9px 15px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #howBtn { pointer-events: auto; }
+  #howPanel {
+    pointer-events: auto;
+    display: none;
+    background: var(--panel);
+    border: 1px solid rgba(255, 210, 74, 0.30);
+    border-radius: 14px;
+    padding: 14px 16px;
+    max-width: min(92vw, 420px);
+    font-size: clamp(13px, 3.4vw, 15px);
+    line-height: 1.5;
+    color: var(--text);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #howPanel.show { display: block; }
+  #howPanel b { color: var(--accent); }
+  #howPanel p { margin: 0 0 8px; }
+  #howPanel p:last-child { margin-bottom: 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">💡</span><span>Simple Circuit</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="modeBtn" type="button">Mode: One Bulb</button>
+  </div>
+</div>
+
+<div id="info">
+  <div id="howPanel">
+    <p><b>Electricity flows in a loop.</b> When the switch is closed, current travels from the battery, through the wires, and lights the bulb.</p>
+    <p><b>Open the switch</b> and the loop breaks — no current, no light.</p>
+    <p><b>Series</b> puts two bulbs on one path, so they share the energy and look dimmer.</p>
+    <p><b>Parallel</b> gives each bulb its own loop, so both shine full bright.</p>
+  </div>
+  <div id="hint">Tap the switch to turn the circuit on and off</div>
+  <button id="howBtn" type="button">How it works</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var modeBtn = document.getElementById("modeBtn");
+  var hint = document.getElementById("hint");
+  var howBtn = document.getElementById("howBtn");
+  var howPanel = document.getElementById("howPanel");
+
+  var W = 0, H = 0, DPR = 1;
+
+  // --- state ---
+  // mode: 0 = single bulb, 1 = series (two bulbs), 2 = parallel (two bulbs)
+  var mode = 0;
+  var closed = true;          // switch closed?
+  var switchAnim = 1;         // 0..1 animated lever position (1 = closed)
+  var glow = 1;               // 0..1 animated brightness of the lit state
+  var flow = 0;               // phase for current dots
+
+  var MODE_LABELS = ["Mode: One Bulb", "Mode: Series", "Mode: Parallel"];
+
+  // layout values recomputed on resize
+  var L = null;
+
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    computeLayout();
+  }
+
+  // The circuit is drawn inside a centered rectangle. Components sit on its edges.
+  function computeLayout() {
+    var pad = Math.min(W, H) * 0.12;
+    // the switch lever + knob protrude past the right edge of the box;
+    // reserve room on the right so nothing clips off-screen.
+    var switchRoom = 86;
+    var availW = W - pad * 2 - switchRoom;
+    var availH = H - pad * 2 - 60; // leave headroom for HUD
+    // keep a friendly aspect for the loop
+    var boxW = Math.min(availW, 620);
+    boxW = Math.max(boxW, 160);
+    var boxH = Math.min(availH, boxW * 0.62);
+    boxH = Math.max(boxH, 180);
+    // centre the box+switch cluster; the box sits left of centre by half
+    // the switch room so the protruding switch stays balanced.
+    var cx = W / 2 - switchRoom / 2;
+    cx = Math.max(boxW / 2 + pad, cx);
+    var cy = H / 2 + 6;
+    var left = cx - boxW / 2;
+    var right = cx + boxW / 2;
+    var top = cy - boxH / 2;
+    var bottom = cy + boxH / 2;
+    L = {
+      cx: cx, cy: cy,
+      left: left, right: right, top: top, bottom: bottom,
+      boxW: boxW, boxH: boxH,
+      unit: Math.min(boxW, boxH)
+    };
+  }
+
+  // --- helpers ---
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp01(v) { return v < 0 ? 0 : (v > 1 ? 1 : v); }
+
+  // Build the ordered list of points the wire path follows (single closed loop
+  // visual). We use it for routing current dots in single & series modes.
+  function loopPath() {
+    return [
+      { x: L.left, y: L.bottom },
+      { x: L.left, y: L.top },
+      { x: L.right, y: L.top },
+      { x: L.right, y: L.bottom }
+    ];
+  }
+
+  // Get a point at fractional distance t (0..1) along an ordered polyline loop.
+  function pointOnLoop(pts, t) {
+    var segs = [];
+    var total = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var a = pts[i];
+      var b = pts[(i + 1) % pts.length];
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      segs.push({ a: a, b: b, len: len });
+      total += len;
+    }
+    var d = (t % 1 + 1) % 1 * total;
+    for (var j = 0; j < segs.length; j++) {
+      if (d <= segs[j].len || j === segs.length - 1) {
+        var f = segs[j].len > 0 ? d / segs[j].len : 0;
+        return {
+          x: lerp(segs[j].a.x, segs[j].b.x, f),
+          y: lerp(segs[j].a.y, segs[j].b.y, f)
+        };
+      }
+      d -= segs[j].len;
+    }
+    return { x: pts[0].x, y: pts[0].y };
+  }
+
+  // --- drawing components ---
+
+  function drawWire(x1, y1, x2, y2, lit) {
+    ctx.lineCap = "round";
+    ctx.lineWidth = 9;
+    ctx.strokeStyle = "#5a4a22";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = lit ? "#ffcf52" : "#9b8a4f";
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  // current dots travelling along a straight segment
+  function drawCurrentOnSegment(x1, y1, x2, y2, speedSign, brightness) {
+    if (brightness <= 0.02) return;
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+    var ux = dx / len, uy = dy / len;
+    var spacing = 34;
+    var count = Math.max(1, Math.floor(len / spacing));
+    var step = len / count;
+    var offset = ((flow * speedSign) % step + step) % step;
+    for (var i = 0; i < count; i++) {
+      var d = offset + i * step;
+      if (d > len) continue;
+      var px = x1 + ux * d;
+      var py = y1 + uy * d;
+      ctx.globalAlpha = brightness;
+      var g = ctx.createRadialGradient(px, py, 0, px, py, 7);
+      g.addColorStop(0, "#fff4c0");
+      g.addColorStop(0.5, "#ffd24a");
+      g.addColorStop(1, "rgba(255,210,74,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#fff8d8";
+      ctx.beginPath();
+      ctx.arc(px, py, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // Battery drawn centered at (x,y), oriented horizontally, total width w.
+  function drawBattery(x, y, w) {
+    var h = Math.max(34, L.unit * 0.16);
+    var gap = w * 0.16;
+    // body wires stubs
+    var bodyLeft = x - w / 2 + gap;
+    var bodyRight = x + w / 2 - gap;
+    drawWire(x - w / 2, y, bodyLeft, y, closed);
+    drawWire(bodyRight, y, x + w / 2, y, closed);
+
+    // negative plate (short, thick)
+    ctx.fillStyle = "#3a3a44";
+    ctx.fillRect(bodyLeft - 5, y - h * 0.32, 9, h * 0.64);
+    // positive plate (tall, thin)
+    ctx.fillStyle = "#3a3a44";
+    ctx.fillRect(bodyRight - 4, y - h * 0.55, 7, h * 1.1);
+
+    // battery cell box
+    var bw = bodyRight - bodyLeft - 12;
+    var bx = bodyLeft + 6;
+    ctx.fillStyle = "#caa23a";
+    roundRect(bx, y - h * 0.4, bw, h * 0.8, 8);
+    ctx.fill();
+    ctx.fillStyle = "#7a5f1a";
+    roundRect(bx, y - h * 0.4, bw, h * 0.8, 8);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#7a5f1a";
+    ctx.stroke();
+    // + and - labels above the plates
+    ctx.fillStyle = "#ffe79a";
+    ctx.font = "bold " + Math.round(h * 0.5) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("+", bodyRight + 2, y - h * 0.86);
+    ctx.fillText("−", bodyLeft + 2, y - h * 0.78);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Switch: a lever that pivots. Returns its hit-box for tapping.
+  var switchHit = { x: 0, y: 0, r: 0 };
+  function drawSwitch(x, y, w) {
+    var pivotX = x - w / 2;
+    var endX = x + w / 2;
+    // wire stubs into the switch
+    drawWire(x - w / 2 - w * 0.35, y, pivotX, y, closed);
+    drawWire(endX, y, x + w / 2 + w * 0.35, y, closed);
+
+    // contact terminals
+    ctx.fillStyle = "#caa23a";
+    ctx.beginPath(); ctx.arc(pivotX, y, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(endX, y, 7, 0, Math.PI * 2); ctx.fill();
+
+    // lever: rotates up when open. switchAnim 1 = closed (flat), 0 = open (lifted)
+    var openAng = -0.62; // radians lifted
+    var ang = lerp(openAng, 0, switchAnim);
+    var leverLen = w + 4;
+    var lx = pivotX + Math.cos(ang) * leverLen;
+    var ly = y + Math.sin(ang) * leverLen;
+    ctx.lineCap = "round";
+    ctx.lineWidth = 11;
+    ctx.strokeStyle = "#5a4a22";
+    ctx.beginPath(); ctx.moveTo(pivotX, y); ctx.lineTo(lx, ly); ctx.stroke();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = closed ? "#ffcf52" : "#c9b878";
+    ctx.beginPath(); ctx.moveTo(pivotX, y); ctx.lineTo(lx, ly); ctx.stroke();
+    // lever knob
+    ctx.fillStyle = "#ffe79a";
+    ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#7a5f1a";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // pivot dot
+    ctx.fillStyle = "#7a5f1a";
+    ctx.beginPath(); ctx.arc(pivotX, y, 5, 0, Math.PI * 2); ctx.fill();
+
+    // tappable region around the whole switch
+    switchHit.x = x;
+    switchHit.y = y - 8;
+    switchHit.r = Math.max(w, 60);
+
+    // little "TAP" label when there's room and circuit is being shown
+    ctx.fillStyle = "rgba(255,231,154,0.85)";
+    ctx.font = "bold " + Math.round(Math.max(13, L.unit * 0.058)) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(closed ? "ON" : "OFF", x, y + Math.max(28, w * 0.5));
+  }
+
+  // Light bulb at (x,y). brightness 0..1. size = diameter of glass.
+  function drawBulb(x, y, size, brightness) {
+    var r = size / 2;
+    // halo
+    if (brightness > 0.02) {
+      var haloR = r * (2.6 + brightness * 2.2);
+      var hg = ctx.createRadialGradient(x, y, 0, x, y, haloR);
+      hg.addColorStop(0, "rgba(255,239,170," + (0.55 * brightness) + ")");
+      hg.addColorStop(0.4, "rgba(255,210,74," + (0.30 * brightness) + ")");
+      hg.addColorStop(1, "rgba(255,210,74,0)");
+      ctx.fillStyle = hg;
+      ctx.beginPath();
+      ctx.arc(x, y, haloR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // base/screw
+    var baseW = r * 0.95;
+    var baseY = y + r * 0.78;
+    ctx.fillStyle = "#9a9aa6";
+    roundRect(x - baseW / 2, baseY, baseW, r * 0.72, 4);
+    ctx.fill();
+    ctx.strokeStyle = "#6e6e7a";
+    ctx.lineWidth = 2;
+    for (var i = 0; i < 3; i++) {
+      var yy = baseY + 6 + i * (r * 0.72 - 8) / 2;
+      ctx.beginPath();
+      ctx.moveTo(x - baseW / 2, yy);
+      ctx.lineTo(x + baseW / 2, yy);
+      ctx.stroke();
+    }
+
+    // glass globe
+    var glassCol;
+    if (brightness > 0.02) {
+      var lit = Math.round(70 + brightness * 28);
+      glassCol = "hsla(48,100%," + lit + "%,0.92)";
+    } else {
+      glassCol = "rgba(225,228,236,0.9)";
+    }
+    var gg = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+    if (brightness > 0.02) {
+      gg.addColorStop(0, "#fffdf2");
+      gg.addColorStop(0.55, "hsl(48,100%," + Math.round(72 + brightness * 22) + "%)");
+      gg.addColorStop(1, "hsl(42,90%," + Math.round(52 + brightness * 18) + "%)");
+    } else {
+      gg.addColorStop(0, "#f4f6fb");
+      gg.addColorStop(1, "#c4c8d4");
+    }
+    ctx.fillStyle = gg;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = brightness > 0.02 ? "rgba(180,140,30,0.6)" : "rgba(120,124,138,0.7)";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // filament
+    var filY = y + r * 0.1;
+    ctx.lineCap = "round";
+    ctx.lineWidth = 3;
+    if (brightness > 0.02) {
+      ctx.shadowColor = "rgba(255,180,40,0.9)";
+      ctx.shadowBlur = 8 + brightness * 14;
+      ctx.strokeStyle = "hsl(" + (40 - brightness * 8) + ",100%," + Math.round(60 + brightness * 35) + "%)";
+    } else {
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "#8a8a96";
+    }
+    ctx.beginPath();
+    var coilN = 4;
+    var coilW = r * 0.62;
+    var startX = x - coilW / 2;
+    ctx.moveTo(x - r * 0.34, baseY - 3);
+    ctx.lineTo(startX, filY);
+    for (var c = 0; c <= coilN; c++) {
+      var fx = startX + (coilW) * (c / coilN);
+      var fy = filY + ((c % 2 === 0) ? -r * 0.22 : r * 0.16);
+      ctx.lineTo(fx, fy);
+    }
+    ctx.lineTo(x + r * 0.34, baseY - 3);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // shine highlight
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath();
+    ctx.ellipse(x - r * 0.34, y - r * 0.4, r * 0.22, r * 0.32, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // --- scene drawing per mode ---
+
+  function drawScene(time) {
+    // background
+    var bg = ctx.createRadialGradient(W / 2, H * 0.42, 0, W / 2, H * 0.42, Math.max(W, H) * 0.8);
+    bg.addColorStop(0, "#1c1708");
+    bg.addColorStop(1, "#0a0904");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // subtle grid
+    ctx.globalAlpha = 0.10;
+    ctx.strokeStyle = "#ffd24a";
+    ctx.lineWidth = 1;
+    var gs = 44;
+    for (var gx = (W / 2 % gs); gx < W; gx += gs) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (var gy = (H / 2 % gs); gy < H; gy += gs) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    var litWire = closed;
+    var br = closed ? glow : 0;
+
+    if (mode === 0) {
+      drawSingle(litWire, br);
+    } else if (mode === 1) {
+      drawSeries(litWire, br);
+    } else {
+      drawParallel(litWire, br);
+    }
+  }
+
+  // SINGLE BULB ---------------------------------------------------------
+  function drawSingle(litWire, br) {
+    var left = L.left, right = L.right, top = L.top, bottom = L.bottom;
+    var bulbSize = L.unit * 0.34;
+
+    // top wire holds the bulb at center-top
+    var bulbX = (left + right) / 2;
+    var bulbY = top;
+
+    // bottom edge holds the battery
+    var batW = Math.min(L.boxW * 0.42, 200);
+    var batX = (left + right) / 2;
+    var batY = bottom;
+
+    // switch on the right edge
+    var swY = (top + bottom) / 2;
+    var swX = right;
+    var swW = Math.min(L.boxH * 0.3, 70);
+
+    // --- wires of the loop ---
+    // left edge (full)
+    drawWire(left, bottom, left, top, litWire && glow > 0.5);
+    // top-left to bulb
+    drawWire(left, top, bulbX - bulbSize * 0.42, top, litWire && glow > 0.5);
+    // bulb to top-right
+    drawWire(bulbX + bulbSize * 0.42, top, right, top, litWire && glow > 0.5);
+    // right edge top to switch
+    drawWire(right, top, right, swY - swW - 4, litWire && glow > 0.5);
+    // right edge switch to bottom
+    drawWire(right, swY + swW + 4, right, bottom, litWire && glow > 0.5);
+    // bottom edges into battery
+    drawWire(right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, litWire && glow > 0.5);
+    drawWire(batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, litWire && glow > 0.5);
+
+    // --- current dots ---
+    // route: along the loop minus the bulb/battery/switch gaps; we just animate
+    // dots on each wire segment, all same direction (clockwise).
+    var seg = [
+      [left, bottom, left, top, 1],
+      [left, top, bulbX - bulbSize * 0.42, top, 1],
+      [bulbX + bulbSize * 0.42, top, right, top, 1],
+      [right, top, right, swY - swW - 4, 1],
+      [right, swY + swW + 4, right, bottom, 1],
+      [right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, -1],
+      [batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, -1]
+    ];
+    if (closed) {
+      for (var s = 0; s < seg.length; s++) {
+        drawCurrentOnSegment(seg[s][0], seg[s][1], seg[s][2], seg[s][3], seg[s][4], glow);
+      }
+    }
+
+    // --- components ---
+    drawBattery(batX, batY, batW);
+    drawSwitch(swX, swY, swW);
+    drawBulb(bulbX, bulbY, bulbSize, br);
+  }
+
+  // SERIES --------------------------------------------------------------
+  function drawSeries(litWire, br) {
+    var left = L.left, right = L.right, top = L.top, bottom = L.bottom;
+    var bulbSize = L.unit * 0.30;
+    // two bulbs on the top edge
+    var b1X = lerp(left, right, 0.34);
+    var b2X = lerp(left, right, 0.66);
+    var bulbY = top;
+
+    var batW = Math.min(L.boxW * 0.42, 200);
+    var batX = (left + right) / 2;
+    var batY = bottom;
+
+    var swY = (top + bottom) / 2;
+    var swX = right;
+    var swW = Math.min(L.boxH * 0.3, 70);
+
+    // series: both bulbs share the path -> dimmer (half-ish)
+    var seriesBr = br * 0.5;
+    var wireLit = litWire && glow > 0.5;
+
+    drawWire(left, bottom, left, top, wireLit);
+    drawWire(left, top, b1X - bulbSize * 0.42, top, wireLit);
+    drawWire(b1X + bulbSize * 0.42, top, b2X - bulbSize * 0.42, top, wireLit);
+    drawWire(b2X + bulbSize * 0.42, top, right, top, wireLit);
+    drawWire(right, top, right, swY - swW - 4, wireLit);
+    drawWire(right, swY + swW + 4, right, bottom, wireLit);
+    drawWire(right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, wireLit);
+    drawWire(batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, wireLit);
+
+    if (closed) {
+      var seg = [
+        [left, bottom, left, top, 1],
+        [left, top, b1X - bulbSize * 0.42, top, 1],
+        [b1X + bulbSize * 0.42, top, b2X - bulbSize * 0.42, top, 1],
+        [b2X + bulbSize * 0.42, top, right, top, 1],
+        [right, top, right, swY - swW - 4, 1],
+        [right, swY + swW + 4, right, bottom, 1],
+        [right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, -1],
+        [batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, -1]
+      ];
+      // series current is smaller -> fewer/dimmer dots
+      for (var s = 0; s < seg.length; s++) {
+        drawCurrentOnSegment(seg[s][0], seg[s][1], seg[s][2], seg[s][3], seg[s][4], glow * 0.6);
+      }
+    }
+
+    drawBattery(batX, batY, batW);
+    drawSwitch(swX, swY, swW);
+    drawBulb(b1X, bulbY, bulbSize, seriesBr);
+    drawBulb(b2X, bulbY, bulbSize, seriesBr);
+
+    drawModeTag("SERIES — bulbs share one path, so they are dimmer");
+  }
+
+  // PARALLEL ------------------------------------------------------------
+  function drawParallel(litWire, br) {
+    var left = L.left, right = L.right, top = L.top, bottom = L.bottom;
+    var bulbSize = L.unit * 0.28;
+    var wireLit = litWire && glow > 0.5;
+
+    var batW = Math.min(L.boxW * 0.38, 190);
+    var batX = (left + right) / 2;
+    var batY = bottom;
+
+    var swY = (top + bottom) / 2;
+    var swX = right;
+    var swW = Math.min(L.boxH * 0.3, 66);
+
+    // Two vertical branches each hold a bulb. They connect a top rail and a
+    // bottom rail. The battery sits on the bottom rail, the switch on the right.
+    var midY = (top + bottom) / 2;
+    var branch1X = lerp(left, right, 0.32);
+    var branch2X = lerp(left, right, 0.68);
+    var railTop = top;
+    var railBot = bottom;
+
+    // outer loop wires
+    drawWire(left, railBot, left, railTop, wireLit);          // left side
+    drawWire(left, railTop, right, railTop, wireLit);          // top rail
+    drawWire(right, railTop, right, swY - swW - 4, wireLit);   // right top to switch
+    drawWire(right, swY + swW + 4, right, railBot, wireLit);   // switch to bottom
+    drawWire(right, railBot, batX + batW / 2 + L.boxW * 0.04, railBot, wireLit);
+    drawWire(batX - batW / 2 - L.boxW * 0.04, railBot, left, railBot, wireLit);
+
+    // two branch wires (vertical) each with a bulb in the middle
+    var bulbY = midY;
+    // branch 1
+    drawWire(branch1X, railTop, branch1X, bulbY - bulbSize * 0.42, wireLit);
+    drawWire(branch1X, bulbY + bulbSize * 0.42, branch1X, railBot, wireLit);
+    // branch 2
+    drawWire(branch2X, railTop, branch2X, bulbY - bulbSize * 0.42, wireLit);
+    drawWire(branch2X, bulbY + bulbSize * 0.42, branch2X, railBot, wireLit);
+
+    // current dots: main rails + each branch (full brightness in parallel)
+    if (closed) {
+      // top rail dots flow left->right toward branches then down
+      drawCurrentOnSegment(left, railTop, right, railTop, 1, glow);
+      drawCurrentOnSegment(left, railBot, left, railTop, 1, glow);
+      drawCurrentOnSegment(right, railTop, right, swY - swW - 4, 1, glow);
+      drawCurrentOnSegment(right, swY + swW + 4, right, railBot, 1, glow);
+      drawCurrentOnSegment(right, railBot, batX + batW / 2 + L.boxW * 0.04, railBot, -1, glow);
+      drawCurrentOnSegment(batX - batW / 2 - L.boxW * 0.04, railBot, left, railBot, -1, glow);
+      // branches: current flows down through each
+      drawCurrentOnSegment(branch1X, railTop, branch1X, bulbY - bulbSize * 0.42, 1, glow);
+      drawCurrentOnSegment(branch1X, bulbY + bulbSize * 0.42, branch1X, railBot, 1, glow);
+      drawCurrentOnSegment(branch2X, railTop, branch2X, bulbY - bulbSize * 0.42, 1, glow);
+      drawCurrentOnSegment(branch2X, bulbY + bulbSize * 0.42, branch2X, railBot, 1, glow);
+    }
+
+    drawBattery(batX, batY, batW);
+    drawSwitch(swX, swY, swW);
+    // parallel: each bulb gets the full voltage -> full bright
+    drawBulb(branch1X, bulbY, bulbSize, br);
+    drawBulb(branch2X, bulbY, bulbSize, br);
+
+    drawModeTag("PARALLEL — each bulb has its own loop, so both are bright");
+  }
+
+  function drawModeTag(text) {
+    ctx.font = "600 " + Math.round(Math.max(12, L.unit * 0.05)) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    var w = ctx.measureText(text).width + 26;
+    var x = W / 2 - w / 2;
+    var y = L.top - Math.max(46, L.unit * 0.2);
+    if (y < 70) y = 70;
+    ctx.fillStyle = "rgba(38,31,12,0.85)";
+    roundRect(x, y - 22, w, 30, 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,210,74,0.3)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = "#ffe79a";
+    ctx.fillText(text, W / 2, y);
+  }
+
+  // --- main loop ---
+  function frame(time) {
+    // animate switch lever toward target
+    var target = closed ? 1 : 0;
+    switchAnim += (target - switchAnim) * 0.22;
+    // animate glow toward target
+    var gTarget = closed ? 1 : 0;
+    glow += (gTarget - glow) * 0.14;
+    glow = clamp01(glow);
+    // flow advances only when current flows
+    if (closed) flow += 1.7 + glow * 1.2;
+
+    drawScene(time);
+    requestAnimationFrame(frame);
+  }
+
+  // --- input ---
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function handleTap(pt) {
+    // tapping near the switch toggles it
+    var dx = pt.x - switchHit.x;
+    var dy = pt.y - switchHit.y;
+    if (dx * dx + dy * dy < switchHit.r * switchHit.r) {
+      closed = !closed;
+      updateHint();
+      return;
+    }
+    // tapping anywhere also toggles for tiny kids (whole canvas is a big target)
+    closed = !closed;
+    updateHint();
+  }
+
+  function updateHint() {
+    if (closed) {
+      hint.textContent = "Circuit ON — tap again to break the loop";
+    } else {
+      hint.textContent = "Circuit OFF — tap to close the switch";
+    }
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    handleTap(pointFromEvent(e));
+  });
+
+  modeBtn.addEventListener("click", function () {
+    mode = (mode + 1) % 3;
+    modeBtn.textContent = MODE_LABELS[mode];
+  });
+
+  howBtn.addEventListener("click", function () {
+    var showing = howPanel.classList.toggle("show");
+    howBtn.textContent = showing ? "Hide" : "How it works";
+  });
+
+  window.addEventListener("resize", resize);
+
+  // --- boot ---
+  resize();
+  updateHint();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () { stage.classList.add("ready"); });
+})();
+</script>
+</body>
+</html>

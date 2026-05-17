@@ -1,0 +1,648 @@
+<!--ARCADELAB
+title: States of Matter
+description: A heat-it-up sandbox — slide from cold to hot and watch particles change from a solid to a liquid to a gas.
+emoji: 🔥
+color: orange
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>States of Matter</title>
+<style>
+  :root {
+    --bg: #140a06;
+    --panel: rgba(46, 26, 14, 0.86);
+    --accent: #ffa94d;
+    --accent2: #4dabff;
+    --text: #fff1e6;
+    --muted: #e0b894;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(255, 169, 77, 0.32);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(14px, 3.6vw, 16px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 169, 77, 0.36);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(78, 44, 22, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+
+  #dock {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #sliderWrap {
+    pointer-events: auto;
+    background: var(--panel);
+    border: 1px solid rgba(255, 169, 77, 0.28);
+    border-radius: 16px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 94vw;
+    width: 460px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #sliderWrap .end {
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 44px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #4dabff, #b0b8c8, #ffd166, #ff6a3d);
+  }
+  input[type=range]::-moz-range-track {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #4dabff, #b0b8c8, #ffd166, #ff6a3d);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    margin-top: -10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #ffd9a8 60%, #ffa94d);
+    border: 3px solid #2a160a;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #ffd9a8 60%, #ffa94d);
+    border: 3px solid #2a160a;
+  }
+  #hint {
+    pointer-events: none;
+    background: var(--panel);
+    border: 1px solid rgba(255, 169, 77, 0.24);
+    border-radius: 13px;
+    padding: 8px 14px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    max-width: 92vw;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #howBtn {
+    position: fixed;
+    z-index: 6;
+    right: clamp(10px, 2.4vw, 18px);
+    bottom: calc(clamp(10px, 2.4vw, 18px) + 132px);
+  }
+  #howPanel {
+    position: fixed;
+    z-index: 7;
+    right: clamp(10px, 2.4vw, 18px);
+    bottom: calc(clamp(10px, 2.4vw, 18px) + 184px);
+    width: min(320px, 90vw);
+    background: var(--panel);
+    border: 1px solid rgba(255, 169, 77, 0.36);
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.5;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: none;
+  }
+  #howPanel.open { display: block; }
+  #howPanel h3 { margin: 0 0 8px; font-size: 18px; }
+  #howPanel p { margin: 0 0 8px; color: var(--muted); }
+  #howPanel p:last-child { margin-bottom: 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🔥</span><span>States of Matter</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="cool" type="button">❄️ Cool</button>
+    <button id="heat" type="button">🔥 Heat</button>
+  </div>
+</div>
+
+<button id="howBtn" type="button">💡 How it works</button>
+<div id="howPanel">
+  <h3>🔥 How it works</h3>
+  <p>Heat gives tiny particles energy to move.</p>
+  <p><b>Cold:</b> they hold still in a neat grid — a solid.</p>
+  <p><b>Warm:</b> they slide past each other — a liquid.</p>
+  <p><b>Hot:</b> they zoom everywhere and bounce — a gas!</p>
+</div>
+
+<div id="dock">
+  <div id="hint">Slide to add heat 🔥</div>
+  <div id="sliderWrap">
+    <span class="end">❄️ Cold</span>
+    <input id="heatSlider" type="range" min="0" max="1000" value="120" aria-label="Temperature">
+    <span class="end">Hot 🔥</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var slider = document.getElementById("heatSlider");
+  var heatBtn = document.getElementById("heat");
+  var coolBtn = document.getElementById("cool");
+  var howBtn = document.getElementById("howBtn");
+  var howPanel = document.getElementById("howPanel");
+
+  var W = 0, H = 0, DPR = 1;
+  var SLIDER_MAX = 1000;
+
+  // heat: 0 (cold) .. 1 (hot). targetHeat follows the slider; heat eases toward it.
+  var targetHeat = parseFloat(slider.value) / SLIDER_MAX;
+  var heat = targetHeat;
+
+  // the box that contains the particles
+  var box = { x: 0, y: 0, w: 0, h: 0 };
+
+  var COLS = 10, ROWS = 10;          // lattice grid -> 100 particles
+  var particles = [];
+  var spacing = 1;                   // lattice spacing
+  var pr = 6;                        // particle radius
+  var thermoGap = 90;                // horizontal space reserved for thermometer
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function computeBox() {
+    var pad = clamp(16, Math.min(W, H) * 0.06, 60);
+    var topGap = clamp(96, H * 0.15, 150);   // room for header
+    var botGap = clamp(150, H * 0.26, 220);  // room for slider + thermometer
+    // space reserved to the right of the box for the thermometer
+    thermoGap = clamp(70, W * 0.12, 120);
+    var availW = W - pad * 2 - thermoGap;    // leave room for thermometer
+    var availH = H - topGap - botGap;
+    var side = Math.max(180, Math.min(availW, availH));
+    box.w = side;
+    box.h = side;
+    // centre the box + thermometer cluster horizontally
+    var clusterW = side + thermoGap;
+    box.x = Math.max(pad, (W - clusterW) / 2);
+    box.y = topGap + Math.max(0, (availH - side) / 2);
+    // recompute lattice geometry
+    spacing = Math.min(box.w, box.h) / (COLS + 1);
+    pr = Math.max(4, spacing * 0.34);
+  }
+
+  // lattice "home" position for particle index i
+  function homePos(i) {
+    var col = i % COLS;
+    var row = Math.floor(i / COLS);
+    var gw = spacing * (COLS - 1);
+    var gh = spacing * (ROWS - 1);
+    var ox = box.x + (box.w - gw) / 2;
+    // lattice anchored toward the bottom of the box (solids/liquids sit low)
+    var oy = box.y + box.h - gh - spacing * 0.6;
+    return { x: ox + col * spacing, y: oy + row * spacing };
+  }
+
+  function initParticles() {
+    particles = [];
+    for (var i = 0; i < COLS * ROWS; i++) {
+      var h = homePos(i);
+      particles.push({
+        x: h.x + rand(-2, 2),
+        y: h.y + rand(-2, 2),
+        vx: rand(-8, 8),
+        vy: rand(-8, 8),
+        phase: rand(0, Math.PI * 2) // for vibration variety
+      });
+    }
+  }
+
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    computeBox();
+    if (particles.length === 0) initParticles();
+  }
+
+  function clamp(lo, v, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  // state name from heat
+  function stateName(h) {
+    if (h < 0.34) return "Solid";
+    if (h < 0.66) return "Liquid";
+    return "Gas";
+  }
+
+  // ---- physics ----
+  function step(dt, time) {
+    // ease heat toward target
+    heat += (targetHeat - heat) * Math.min(1, dt * 2.4);
+
+    var n = particles.length;
+    // regime weights
+    // solidW: 1 at heat 0 -> 0 at heat ~0.4
+    var solidW = clamp(0, (0.42 - heat) / 0.42, 1);
+    // gasW: 0 until ~0.6 -> 1 at heat 1
+    var gasW = clamp(0, (heat - 0.58) / 0.42, 1);
+    // liquidW: the middle
+    var liquidW = clamp(0, 1 - solidW - gasW, 1);
+
+    // overall thermal speed scale
+    var thermal = 14 + heat * heat * 460;
+
+    var i, p;
+
+    // pairwise interactions: keep particles apart; in liquid they cohere mildly.
+    // O(n^2) with n=100 is fine.
+    var collideDist = pr * 2.05;
+    var cohereDist = pr * 3.4;
+    for (i = 0; i < n; i++) {
+      p = particles[i];
+      for (var j = i + 1; j < n; j++) {
+        var q = particles[j];
+        var dx = q.x - p.x;
+        var dy = q.y - p.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < 0.0001) { dx = rand(-1, 1); dy = rand(-1, 1); d2 = dx * dx + dy * dy; }
+        var d = Math.sqrt(d2);
+        if (d < collideDist) {
+          // soft separation
+          var overlap = (collideDist - d);
+          var nx = dx / d, ny = dy / d;
+          var push = overlap * 0.5;
+          p.x -= nx * push; p.y -= ny * push;
+          q.x += nx * push; q.y += ny * push;
+          // exchange a little velocity
+          var rvx = q.vx - p.vx, rvy = q.vy - p.vy;
+          var sep = rvx * nx + rvy * ny;
+          if (sep < 0) {
+            var imp = sep * 0.5;
+            p.vx += nx * imp; p.vy += ny * imp;
+            q.vx -= nx * imp; q.vy -= ny * imp;
+          }
+        } else if (liquidW > 0.01 && d < cohereDist) {
+          // gentle cohesion so liquid stays as a blob
+          var cn = liquidW * 30 * (1 - d / cohereDist);
+          var ux = dx / d, uy = dy / d;
+          p.vx += ux * cn * dt;
+          p.vy += uy * cn * dt;
+          q.vx -= ux * cn * dt;
+          q.vy -= uy * cn * dt;
+        }
+      }
+    }
+
+    for (i = 0; i < n; i++) {
+      p = particles[i];
+      var home = homePos(i);
+
+      // --- solid behaviour: spring back to lattice home, vibrate ---
+      if (solidW > 0.001) {
+        var k = 60 * solidW;
+        p.vx += (home.x - p.x) * k * dt;
+        p.vy += (home.y - p.y) * k * dt;
+        // tiny vibration jitter
+        var vib = solidW * (4 + heat * 40);
+        p.vx += Math.cos(time * 0.012 + p.phase) * vib * dt * 6;
+        p.vy += Math.sin(time * 0.013 + p.phase * 1.7) * vib * dt * 6;
+      }
+
+      // --- gravity in liquid regime so it settles at the bottom ---
+      var grav = liquidW * 260 + solidW * 0 + 0;
+      p.vy += grav * dt;
+
+      // --- random thermal kicks (more when hot) ---
+      var kick = thermal * (0.4 + gasW * 0.6);
+      p.vx += rand(-1, 1) * kick * dt;
+      p.vy += rand(-1, 1) * kick * dt;
+
+      // --- damping: strong when cold/liquid, light when gas ---
+      var damp = 1 - (0.9 - gasW * 0.86) * dt;
+      damp = clamp(0, damp, 1);
+      p.vx *= damp;
+      p.vy *= damp;
+
+      // --- speed cap so things stay stable ---
+      var spd2 = p.vx * p.vx + p.vy * p.vy;
+      var maxSpd = 60 + heat * 620;
+      if (spd2 > maxSpd * maxSpd) {
+        var s = maxSpd / Math.sqrt(spd2);
+        p.vx *= s; p.vy *= s;
+      }
+
+      // --- integrate ---
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      // --- walls ---
+      var minX = box.x + pr, maxX = box.x + box.w - pr;
+      var minY = box.y + pr, maxY = box.y + box.h - pr;
+      if (p.x < minX) { p.x = minX; p.vx = Math.abs(p.vx) * 0.86; }
+      else if (p.x > maxX) { p.x = maxX; p.vx = -Math.abs(p.vx) * 0.86; }
+      if (p.y < minY) { p.y = minY; p.vy = Math.abs(p.vy) * 0.86; }
+      else if (p.y > maxY) { p.y = maxY; p.vy = -Math.abs(p.vy) * 0.86; }
+    }
+  }
+
+  // ---- particle colour from heat + individual speed ----
+  function particleColor(p) {
+    var spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+    // base hue: 210 (cool blue) -> 22 (hot orange-red)
+    var t = clamp(0, heat * 0.7 + Math.min(spd / 420, 1) * 0.3, 1);
+    var hue = 210 - t * 192; // 210 -> 18
+    var light = 52 + t * 16;
+    return "hsl(" + hue.toFixed(0) + ",90%," + light.toFixed(0) + "%)";
+  }
+
+  // ---- draw ----
+  function draw(time) {
+    // background
+    var topCol = "#1a0e07";
+    var bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, topCol);
+    bg.addColorStop(1, "#0c0703");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // ambient heat glow from below when hot
+    if (heat > 0.4) {
+      var glow = ctx.createRadialGradient(W / 2, H, 0, W / 2, H, H * 0.9);
+      glow.addColorStop(0, "rgba(255,90,30," + ((heat - 0.4) * 0.5).toFixed(3) + ")");
+      glow.addColorStop(1, "rgba(255,90,30,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // ---- the box ----
+    var floorGlow = clamp(0, heat, 1);
+    // box interior
+    roundRect(box.x, box.y, box.w, box.h, 16);
+    var inside = ctx.createLinearGradient(0, box.y, 0, box.y + box.h);
+    inside.addColorStop(0, "rgba(255,255,255,0.04)");
+    inside.addColorStop(1, "rgba(0,0,0,0.25)");
+    ctx.fillStyle = inside;
+    ctx.fill();
+
+    // hot floor strip
+    ctx.save();
+    roundRect(box.x, box.y, box.w, box.h, 16);
+    ctx.clip();
+    var floorH = box.h * 0.16;
+    var fl = ctx.createLinearGradient(0, box.y + box.h - floorH, 0, box.y + box.h);
+    fl.addColorStop(0, "rgba(255,120,40,0)");
+    fl.addColorStop(1, "rgba(255,120,40," + (0.15 + floorGlow * 0.55).toFixed(3) + ")");
+    ctx.fillStyle = fl;
+    ctx.fillRect(box.x, box.y + box.h - floorH, box.w, floorH);
+    ctx.restore();
+
+    // box border
+    roundRect(box.x, box.y, box.w, box.h, 16);
+    ctx.strokeStyle = "rgba(255,169,77,0.7)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // ---- particles ----
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      var col = particleColor(p);
+      // glow for hot particles
+      if (heat > 0.45) {
+        var gl = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, pr * 3);
+        gl.addColorStop(0, "hsla(24,100%,60%," + ((heat - 0.45) * 0.5).toFixed(3) + ")");
+        gl.addColorStop(1, "hsla(24,100%,60%,0)");
+        ctx.fillStyle = gl;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, pr * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, pr, 0, Math.PI * 2);
+      ctx.fill();
+      // highlight
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.beginPath();
+      ctx.arc(p.x - pr * 0.32, p.y - pr * 0.32, pr * 0.36, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ---- thermometer ----
+    drawThermometer();
+
+    // ---- state label ----
+    var name = stateName(heat);
+    var emoji = name === "Solid" ? "🧊" : (name === "Liquid" ? "💧" : "💨");
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#fff1e6";
+    ctx.font = "700 " + clamp(20, box.w * 0.11, 40) + "px system-ui, sans-serif";
+    var labelY = box.y - clamp(10, H * 0.02, 18);
+    ctx.fillText(emoji + "  " + name, box.x + box.w / 2, labelY);
+    ctx.textAlign = "left";
+  }
+
+  function drawThermometer() {
+    var tw = clamp(26, W * 0.05, 40);             // bulb/tube width
+    // centre the thermometer inside the reserved gap beside the box
+    var tx = box.x + box.w + (thermoGap - tw) / 2;
+    if (tx + tw > W - 10) tx = W - 10 - tw;       // keep on screen
+    if (tx < box.x + box.w + 6) tx = box.x + box.w + 6;
+    var tubeTop = box.y + box.h * 0.04;
+    var tubeBot = box.y + box.h * 0.86;
+    var bulbR = tw * 0.85;
+    var bulbY = tubeBot + bulbR * 0.6;
+    var tubeH = tubeBot - tubeTop;
+
+    // tube background
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(255,255,255,0.16)";
+    ctx.lineWidth = tw;
+    ctx.beginPath();
+    ctx.moveTo(tx + tw / 2, tubeTop);
+    ctx.lineTo(tx + tw / 2, tubeBot);
+    ctx.stroke();
+
+    // bulb background
+    ctx.fillStyle = "rgba(255,255,255,0.16)";
+    ctx.beginPath();
+    ctx.arc(tx + tw / 2, bulbY, bulbR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // mercury fill
+    var fillTop = tubeBot - heat * tubeH;
+    var hue = 210 - heat * 192;
+    var merc = "hsl(" + hue.toFixed(0) + ",92%,56%)";
+    ctx.strokeStyle = merc;
+    ctx.lineWidth = tw * 0.56;
+    ctx.beginPath();
+    ctx.moveTo(tx + tw / 2, fillTop);
+    ctx.lineTo(tx + tw / 2, bulbY);
+    ctx.stroke();
+    ctx.fillStyle = merc;
+    ctx.beginPath();
+    ctx.arc(tx + tw / 2, bulbY, bulbR * 0.78, 0, Math.PI * 2);
+    ctx.fill();
+
+    // tick marks
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 2;
+    for (var t = 0; t <= 4; t++) {
+      var ty = tubeBot - (t / 4) * tubeH;
+      ctx.beginPath();
+      ctx.moveTo(tx - 4, ty);
+      ctx.lineTo(tx + 2, ty);
+      ctx.stroke();
+    }
+  }
+
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---- main loop ----
+  var lastTime = 0;
+  function frame(time) {
+    var dt = lastTime ? Math.min((time - lastTime) / 1000, 0.04) : 0.016;
+    lastTime = time;
+    // small fixed substeps for stability
+    var steps = 2;
+    for (var s = 0; s < steps; s++) {
+      step(dt / steps, time);
+    }
+    draw(time);
+    requestAnimationFrame(frame);
+  }
+
+  // ---- input ----
+  slider.addEventListener("input", function () {
+    targetHeat = parseFloat(slider.value) / SLIDER_MAX;
+  });
+
+  function nudge(delta) {
+    var v = clamp(0, parseFloat(slider.value) + delta, SLIDER_MAX);
+    slider.value = String(v);
+    targetHeat = v / SLIDER_MAX;
+  }
+  heatBtn.addEventListener("click", function () { nudge(SLIDER_MAX * 0.22); });
+  coolBtn.addEventListener("click", function () { nudge(-SLIDER_MAX * 0.22); });
+
+  howBtn.addEventListener("click", function () {
+    howPanel.classList.toggle("open");
+  });
+
+  // ---- boot ----
+  window.addEventListener("resize", function () {
+    resize();
+  });
+  resize();
+  initParticles();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () {
+    stage.classList.add("ready");
+  });
+})();
+</script>
+</body>
+</html>

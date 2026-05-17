@@ -1,0 +1,511 @@
+<!--ARCADELAB
+title: Wave Tank
+description: A top-down water tank — tap to send ripples spreading out, switch on a second source, and watch the waves cross and interfere.
+emoji: 🌊
+color: teal
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Wave Tank</title>
+<style>
+  :root {
+    --bg: #03161a;
+    --panel: rgba(8, 42, 49, 0.86);
+    --accent: #4fe3d6;
+    --accent2: #38c8e0;
+    --text: #e3fbf8;
+    --muted: #9fd6d2;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    letter-spacing: 0.2px;
+    background: var(--panel);
+    border: 1px solid rgba(79, 227, 214, 0.30);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(14px, 3.6vw, 16px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(79, 227, 214, 0.34);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 46px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(12, 60, 70, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  button.on {
+    background: linear-gradient(180deg, #4fe3d6, #2bb6cf);
+    color: #02232a;
+    border-color: #9af2e9;
+  }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(79, 227, 214, 0.24);
+    border-radius: 13px;
+    padding: 9px 15px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #howBtn { pointer-events: auto; }
+  #howPanel {
+    pointer-events: auto;
+    display: none;
+    background: var(--panel);
+    border: 1px solid rgba(79, 227, 214, 0.30);
+    border-radius: 14px;
+    padding: 14px 16px;
+    max-width: min(92vw, 420px);
+    font-size: clamp(13px, 3.4vw, 15px);
+    line-height: 1.5;
+    color: var(--text);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #howPanel.show { display: block; }
+  #howPanel b { color: var(--accent); }
+  #howPanel p { margin: 0 0 8px; }
+  #howPanel p:last-child { margin-bottom: 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🌊</span><span>Wave Tank</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="srcBtn" type="button">2nd Source: Off</button>
+    <button id="calmBtn" type="button">Calm</button>
+  </div>
+</div>
+
+<div id="info">
+  <div id="howPanel">
+    <p><b>Tap the water</b> to make a ripple. It spreads out in a growing circle, just like a stone dropped in a pond.</p>
+    <p>Turn on the <b>2nd source</b> and two sets of ripples will cross each other.</p>
+    <p>Where two crests meet, the wave gets <b>extra big and bright</b> — that is constructive interference.</p>
+    <p>Where a crest meets a dip, they <b>cancel out</b> and the water goes flat and dark.</p>
+  </div>
+  <div id="hint">Tap the water to make a ripple</div>
+  <button id="howBtn" type="button">How it works</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var srcBtn = document.getElementById("srcBtn");
+  var calmBtn = document.getElementById("calmBtn");
+  var hint = document.getElementById("hint");
+  var howBtn = document.getElementById("howBtn");
+  var howPanel = document.getElementById("howPanel");
+
+  var W = 0, H = 0, DPR = 1;
+
+  // --- wave model ---
+  // We render the surface height on a coarse grid into an ImageData buffer,
+  // then let the browser scale it up. Each "source" emits radial waves.
+  // Height at a point = sum over sources of A * sin(phase) * envelope.
+
+  var CELL = 7;            // device-independent pixels per grid cell
+  var cols = 0, rows = 0;
+  var grid = null;         // Float32Array of heights, length cols*rows
+  var img = null;          // ImageData for the coarse field
+  var buf = null;          // backing canvas for the coarse field
+  var bufCtx = null;
+
+  var WAVELENGTH = 58;     // px between crests
+  var SPEED = 150;         // px per second the wavefront travels
+  var DAMP = 360;          // px distance over which a ripple fades
+
+  // continuous sources (the optional 2nd source, and 1st when toggled on)
+  // each: {x,y, on}
+  var contSources = [];
+
+  // transient ripples from taps: {x,y, t0} -- t0 is start time (seconds)
+  var ripples = [];
+
+  var twoSources = false;
+  var startTime = 0;
+  var nowSec = 0;
+
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+
+    // coarse grid sized in CSS pixels
+    cols = Math.max(2, Math.ceil(W / CELL) + 1);
+    rows = Math.max(2, Math.ceil(H / CELL) + 1);
+    grid = new Float32Array(cols * rows);
+
+    buf = document.createElement("canvas");
+    buf.width = cols;
+    buf.height = rows;
+    bufCtx = buf.getContext("2d");
+    if (bufCtx) {
+      img = bufCtx.createImageData(cols, rows);
+    }
+
+    placeSources();
+  }
+
+  // Position the continuous sources. Source 0 lives left-of-center, source 1
+  // right-of-center; both off until enabled.
+  function placeSources() {
+    contSources = [
+      { x: W * 0.34, y: H * 0.52, on: false },
+      { x: W * 0.66, y: H * 0.52, on: false }
+    ];
+    if (twoSources) {
+      contSources[0].on = true;
+      contSources[1].on = true;
+    }
+  }
+
+  function rippleAt(x, y) {
+    ripples.push({ x: x, y: y, t0: nowSec });
+    // keep the list bounded
+    if (ripples.length > 24) ripples.splice(0, ripples.length - 24);
+  }
+
+  // --- height field ---
+  var TWO_PI = Math.PI * 2;
+  var K = 0;   // angular wavenumber, set on resize-independent constant
+  var OMEGA = 0;
+
+  function recomputeConstants() {
+    K = TWO_PI / WAVELENGTH;
+    OMEGA = K * SPEED; // so phase = k*r - omega*t keeps crest speed = SPEED
+  }
+
+  // height contribution of a continuous source at distance r
+  function contHeight(r, t) {
+    // wavefront has travelled SPEED*t; only affect points it has reached
+    var front = SPEED * t;
+    if (r > front) return 0;
+    var phase = K * r - OMEGA * t;
+    // amplitude falls with distance (gentle) and fades far out
+    var amp = 1 / (1 + r / 130);
+    // soft fade-in at the very front so it doesn't pop
+    var edge = front - r;
+    var fadeIn = edge < 40 ? edge / 40 : 1;
+    return Math.sin(phase) * amp * fadeIn;
+  }
+
+  // height contribution of a transient tap ripple
+  function rippleHeight(rp, t) {
+    var age = t - rp.t0;
+    if (age <= 0) return null;
+    // a finite ring that expands and decays
+    return age;
+  }
+
+  function computeField() {
+    var t = nowSec;
+    var n = grid.length;
+    var i;
+    for (i = 0; i < n; i++) grid[i] = 0;
+
+    // continuous sources
+    var cs;
+    for (cs = 0; cs < contSources.length; cs++) {
+      var src = contSources[cs];
+      if (!src.on) continue;
+      var sx = src.x, sy = src.y;
+      var idx = 0;
+      for (var ry = 0; ry < rows; ry++) {
+        var py = ry * CELL;
+        var dy = py - sy;
+        for (var rx = 0; rx < cols; rx++) {
+          var px = rx * CELL;
+          var dx = px - sx;
+          var r = Math.sqrt(dx * dx + dy * dy);
+          grid[idx] += contHeight(r, t);
+          idx++;
+        }
+      }
+    }
+
+    // transient tap ripples
+    for (var rpI = 0; rpI < ripples.length; rpI++) {
+      var rp = ripples[rpI];
+      var age = t - rp.t0;
+      if (age <= 0) continue;
+      var front = SPEED * age;
+      if (front - DAMP > Math.max(W, H) * 1.5) continue; // fully gone
+      var rsx = rp.x, rsy = rp.y;
+      var idx2 = 0;
+      for (var ry2 = 0; ry2 < rows; ry2++) {
+        var py2 = ry2 * CELL;
+        var dy2 = py2 - rsy;
+        for (var rx2 = 0; rx2 < cols; rx2++) {
+          var px2 = rx2 * CELL;
+          var dx2 = px2 - rsx;
+          var r2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+          if (r2 <= front) {
+            var phase2 = K * r2 - OMEGA * age;
+            // ring envelope: bump near the wavefront, decays with age & distance
+            var behind = front - r2;
+            var ringEnv = Math.exp(-behind * behind / (2 * 90 * 90));
+            var distFade = 1 / (1 + r2 / 150);
+            var ageFade = Math.exp(-age * 0.55);
+            grid[idx2] += Math.sin(phase2) * ringEnv * distFade * ageFade * 1.5;
+          }
+          idx2++;
+        }
+      }
+    }
+
+    // drop fully-faded ripples
+    for (var d = ripples.length - 1; d >= 0; d--) {
+      if (nowSec - ripples[d].t0 > 7) ripples.splice(d, 1);
+    }
+  }
+
+  // --- rendering ---
+  function render() {
+    if (!img) return;
+    var data = img.data;
+    var idx = 0;
+    var px4 = 0;
+    for (var ry = 0; ry < rows; ry++) {
+      for (var rx = 0; rx < cols; rx++) {
+        var h = grid[idx];
+        // map height (~ -2..2) to a teal water color.
+        // crests -> bright cyan, troughs -> deep dark blue.
+        var v = h;
+        if (v > 1.6) v = 1.6;
+        if (v < -1.6) v = -1.6;
+        var nrm = v / 1.6; // -1..1
+        var rCol, gCol, bCol;
+        if (nrm >= 0) {
+          // base water -> bright crest
+          rCol = 10 + nrm * 150;
+          gCol = 70 + nrm * 175;
+          bCol = 95 + nrm * 130;
+        } else {
+          // base water -> dark trough
+          var d2 = -nrm;
+          rCol = 10 - d2 * 8;
+          gCol = 70 - d2 * 58;
+          bCol = 95 - d2 * 60;
+        }
+        if (rCol < 0) rCol = 0; if (rCol > 255) rCol = 255;
+        if (gCol < 0) gCol = 0; if (gCol > 255) gCol = 255;
+        if (bCol < 0) bCol = 0; if (bCol > 255) bCol = 255;
+        data[px4] = rCol;
+        data[px4 + 1] = gCol;
+        data[px4 + 2] = bCol;
+        data[px4 + 3] = 255;
+        idx++;
+        px4 += 4;
+      }
+    }
+    bufCtx.putImageData(img, 0, 0);
+
+    // scale the coarse field up smoothly to fill the canvas
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(buf, 0, 0, cols, rows, 0, 0, (cols) * CELL, (rows) * CELL);
+
+    // vignette for depth
+    var vg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3,
+      W / 2, H / 2, Math.max(W, H) * 0.75);
+    vg.addColorStop(0, "rgba(0,0,0,0)");
+    vg.addColorStop(1, "rgba(0,8,12,0.55)");
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+
+    // draw the source markers
+    for (var s = 0; s < contSources.length; s++) {
+      var src = contSources[s];
+      if (!src.on) continue;
+      drawSourceMarker(src.x, src.y, true);
+    }
+
+    // tank rim
+    ctx.strokeStyle = "rgba(79,227,214,0.35)";
+    ctx.lineWidth = 4;
+    roundRectStroke(6, 6, W - 12, H - 12, 18);
+  }
+
+  function drawSourceMarker(x, y, pulsing) {
+    var pr = pulsing ? 11 + 3 * Math.sin(nowSec * 6) : 11;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, pr * 2.2);
+    g.addColorStop(0, "rgba(255,255,255,0.9)");
+    g.addColorStop(0.4, "rgba(150,242,233,0.7)");
+    g.addColorStop(1, "rgba(150,242,233,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, pr * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(x, y, pr * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function roundRectStroke(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // --- main loop ---
+  function frame(ts) {
+    if (!startTime) startTime = ts;
+    nowSec = (ts - startTime) / 1000;
+
+    computeField();
+    render();
+
+    requestAnimationFrame(frame);
+  }
+
+  // --- input ---
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    if (pt.x < 0 || pt.y < 0 || pt.x > W || pt.y > H) return;
+    rippleAt(pt.x, pt.y);
+    hint.textContent = "Ripple! Tap more spots to see them cross";
+  });
+
+  srcBtn.addEventListener("click", function () {
+    twoSources = !twoSources;
+    srcBtn.textContent = twoSources ? "2nd Source: On" : "2nd Source: Off";
+    srcBtn.classList.toggle("on", twoSources);
+    contSources[0].on = twoSources;
+    contSources[1].on = twoSources;
+    if (twoSources) {
+      hint.textContent = "Two sources — watch the bright and dark bands appear";
+    } else {
+      hint.textContent = "Tap the water to make a ripple";
+    }
+  });
+
+  calmBtn.addEventListener("click", function () {
+    ripples = [];
+    twoSources = false;
+    srcBtn.textContent = "2nd Source: Off";
+    srcBtn.classList.remove("on");
+    contSources[0].on = false;
+    contSources[1].on = false;
+    // reset the clock so old continuous phase doesn't linger
+    startTime = 0;
+    hint.textContent = "Tap the water to make a ripple";
+  });
+
+  howBtn.addEventListener("click", function () {
+    var showing = howPanel.classList.toggle("show");
+    howBtn.textContent = showing ? "Hide" : "How it works";
+  });
+
+  window.addEventListener("resize", resize);
+
+  // --- boot ---
+  recomputeConstants();
+  resize();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () { stage.classList.add("ready"); });
+})();
+</script>
+</body>
+</html>

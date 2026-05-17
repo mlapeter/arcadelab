@@ -1,0 +1,741 @@
+<!--ARCADELAB
+title: Moon Phases Orrery
+description: A drag-the-Moon orrery — see how the Sun lights the Moon and why it looks like a crescent, half, or full Moon from Earth.
+emoji: 🌙
+color: blue
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Moon Phases Orrery</title>
+<style>
+  :root {
+    --bg: #060a18;
+    --panel: rgba(18, 26, 52, 0.86);
+    --accent: #7db4ff;
+    --accent2: #ffd166;
+    --text: #eaf1ff;
+    --muted: #9fb2da;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(125, 180, 255, 0.30);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(14px, 3.6vw, 16px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(125, 180, 255, 0.34);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(40, 56, 100, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+
+  #dock {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #sliderWrap {
+    pointer-events: auto;
+    background: var(--panel);
+    border: 1px solid rgba(125, 180, 255, 0.26);
+    border-radius: 16px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 94vw;
+    width: 460px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #sliderWrap .end {
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 44px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #1a2547, #4a6cff, #ffd166);
+  }
+  input[type=range]::-moz-range-track {
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #1a2547, #4a6cff, #ffd166);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    margin-top: -10px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #cfe0ff 60%, #7db4ff);
+    border: 3px solid #0c1430;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffffff, #cfe0ff 60%, #7db4ff);
+    border: 3px solid #0c1430;
+  }
+  #hint {
+    pointer-events: none;
+    background: var(--panel);
+    border: 1px solid rgba(125, 180, 255, 0.22);
+    border-radius: 13px;
+    padding: 8px 14px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    max-width: 92vw;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #howBtn {
+    position: fixed;
+    z-index: 6;
+    right: clamp(10px, 2.4vw, 18px);
+    bottom: calc(clamp(10px, 2.4vw, 18px) + 132px);
+  }
+  #howPanel {
+    position: fixed;
+    z-index: 7;
+    right: clamp(10px, 2.4vw, 18px);
+    bottom: calc(clamp(10px, 2.4vw, 18px) + 184px);
+    width: min(320px, 90vw);
+    background: var(--panel);
+    border: 1px solid rgba(125, 180, 255, 0.34);
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.5;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: none;
+  }
+  #howPanel.open { display: block; }
+  #howPanel h3 { margin: 0 0 8px; font-size: 18px; }
+  #howPanel p { margin: 0 0 8px; color: var(--muted); }
+  #howPanel p:last-child { margin-bottom: 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🌙</span><span>Moon Phases Orrery</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="play" type="button">⏸ Pause</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+</div>
+
+<button id="howBtn" type="button">💡 How it works</button>
+<div id="howPanel">
+  <h3>🌙 How it works</h3>
+  <p>The Sun's light only ever lights up <b>half</b> of the Moon.</p>
+  <p>As the Moon orbits Earth, we see different amounts of that lit half — that makes the phases.</p>
+  <p>Drag the Moon or move the slider. The little circle shows what you'd see from Earth!</p>
+</div>
+
+<div id="dock">
+  <div id="hint">Drag the Moon around its orbit 👆</div>
+  <div id="sliderWrap">
+    <span class="end">🌑 New</span>
+    <input id="orbit" type="range" min="0" max="1000" value="125" aria-label="Moon position">
+    <span class="end">Full 🌕</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var slider = document.getElementById("orbit");
+  var playBtn = document.getElementById("play");
+  var resetBtn = document.getElementById("reset");
+  var howBtn = document.getElementById("howBtn");
+  var howPanel = document.getElementById("howPanel");
+
+  var W = 0, H = 0, DPR = 1;
+
+  // angle: position of Moon around Earth, measured so that
+  //   angle = 0  -> Moon between Earth and Sun (New Moon)
+  //   angle = PI -> Moon on far side from Sun (Full Moon)
+  // The Sun is to the LEFT of the screen.
+  var SLIDER_MAX = 1000;
+  var angle = (parseFloat(slider.value) / SLIDER_MAX) * Math.PI * 2;
+  var playing = true;
+  var SPEED = 0.28; // radians per second when auto-playing
+  var dragging = false;
+  var dragPointerId = null;
+
+  // background stars
+  var bgStars = [];
+
+  function makeBgStars() {
+    bgStars = [];
+    var n = Math.round((W * H) / 11000);
+    n = Math.max(50, Math.min(280, n));
+    for (var i = 0; i < n; i++) {
+      bgStars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: 0.3 + Math.random() * 1.4,
+        a: 0.15 + Math.random() * 0.7,
+        tw: Math.random() * Math.PI * 2,
+        sp: 0.4 + Math.random() * 1.6
+      });
+    }
+  }
+
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    makeBgStars();
+  }
+
+  // ---- layout of the orrery scene ----
+  function layout() {
+    // Earth sits slightly right of centre so the Sun (left) has room.
+    var cx = W * 0.54;
+    var cy = H * 0.46;
+    var minSide = Math.min(W, H);
+    var orbitR = Math.min(minSide * 0.30, W * 0.30);
+    orbitR = Math.max(orbitR, 60);
+    var earthR = Math.max(minSide * 0.052, 22);
+    var moonR = Math.max(earthR * 0.42, 12);
+    return { cx: cx, cy: cy, orbitR: orbitR, earthR: earthR, moonR: moonR };
+  }
+
+  // phase name from angle (0 = new, PI = full)
+  function phaseInfo(a) {
+    // normalise 0..2PI
+    var t = a % (Math.PI * 2);
+    if (t < 0) t += Math.PI * 2;
+    var deg = t * 180 / Math.PI;
+    // fraction of disk illuminated, as seen from Earth
+    var illum = (1 - Math.cos(t)) / 2; // 0 at new, 1 at full
+    var name;
+    if (deg < 22.5 || deg >= 337.5) name = "New Moon";
+    else if (deg < 67.5) name = "Waxing Crescent";
+    else if (deg < 112.5) name = "First Quarter";
+    else if (deg < 157.5) name = "Waxing Gibbous";
+    else if (deg < 202.5) name = "Full Moon";
+    else if (deg < 247.5) name = "Waning Gibbous";
+    else if (deg < 292.5) name = "Last Quarter";
+    else name = "Waning Crescent";
+    // waxing = first half of cycle (lit side grows)
+    var waxing = t < Math.PI;
+    return { illum: illum, name: name, waxing: waxing, t: t };
+  }
+
+  // Draw the Moon-as-seen-from-Earth into a circle.
+  // illum: 0..1 illuminated fraction. waxing true -> lit on the right.
+  // Drawn by scanning rows: for each row the lit part runs between the
+  // circular limb and the terminator ellipse. This is correct for every
+  // phase (crescent, quarter, gibbous) with no winding-direction pitfalls.
+  function drawMoonDisk(x, y, r, illum, waxing) {
+    ctx.save();
+    // dark moon base
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = "#2a2f44";
+    ctx.fill();
+
+    // terminator half-width factor k in -1..1
+    //   illum 0   -> k =  1   illum 0.5 -> k = 0   illum 1 -> k = -1
+    var k = 1 - 2 * illum;
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.clip(); // never draw outside the moon circle
+
+    var g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+    g.addColorStop(0, "#fff7d6");
+    g.addColorStop(1, "#ffe9a8");
+    ctx.fillStyle = g;
+
+    if (illum >= 0.999) {
+      // full moon: the whole disk is lit
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    } else if (illum > 0.001) {
+      var rows = Math.max(36, Math.round(r * 1.6));
+      for (var i = 0; i < rows; i++) {
+        var fy = (i + 0.5) / rows;          // 0..1
+        var yy = y - r + fy * 2 * r;        // row centre y
+        var ny = (yy - y) / r;              // -1..1
+        var halfW = Math.sqrt(Math.max(0, 1 - ny * ny)) * r; // limb half-width
+        if (halfW <= 0.2) continue;
+        var termX = x + k * halfW;          // terminator x at this row
+        var rowH = (2 * r) / rows + 1;
+        var lx, rx;
+        if (waxing) {
+          // lit on the right: from terminator to right limb
+          lx = termX; rx = x + halfW;
+        } else {
+          // lit on the left: from left limb to terminator
+          lx = x - halfW; rx = termX;
+        }
+        if (rx > lx) {
+          ctx.fillRect(lx, yy - rowH / 2, rx - lx, rowH);
+        }
+      }
+    }
+    ctx.restore();
+
+    // outline
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // ---- drawing the whole scene ----
+  function draw(time) {
+    // sky gradient
+    var bg = ctx.createRadialGradient(W * 0.1, H * 0.3, 0, W * 0.1, H * 0.3, Math.max(W, H));
+    bg.addColorStop(0, "#0d1838");
+    bg.addColorStop(1, "#05070f");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // background stars
+    for (var i = 0; i < bgStars.length; i++) {
+      var b = bgStars[i];
+      var tw = 0.55 + 0.45 * Math.sin(time * 0.001 * b.sp + b.tw);
+      ctx.globalAlpha = b.a * tw;
+      ctx.fillStyle = "#dce6ff";
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    var L = layout();
+    var cx = L.cx, cy = L.cy;
+
+    // ---- Sun (off to the left) ----
+    var sunX = -W * 0.04;
+    var sunY = cy;
+    var sunR = Math.max(Math.min(W, H) * 0.14, 44);
+    var halo = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 4.2);
+    halo.addColorStop(0, "rgba(255,221,120,0.55)");
+    halo.addColorStop(0.3, "rgba(255,200,80,0.22)");
+    halo.addColorStop(1, "rgba(255,200,80,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR * 4.2, 0, Math.PI * 2);
+    ctx.fill();
+    var sunCore = ctx.createRadialGradient(sunX - sunR * 0.2, sunY - sunR * 0.2, 0, sunX, sunY, sunR);
+    sunCore.addColorStop(0, "#fffceb");
+    sunCore.addColorStop(0.55, "#ffd766");
+    sunCore.addColorStop(1, "#ff9e2e");
+    ctx.fillStyle = sunCore;
+    ctx.beginPath();
+    ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // sun rays toward the scene (subtle)
+    ctx.save();
+    ctx.globalAlpha = 0.10;
+    ctx.strokeStyle = "#ffe6a0";
+    ctx.lineWidth = 2;
+    for (var ry = -3; ry <= 3; ry++) {
+      ctx.beginPath();
+      ctx.moveTo(sunX + sunR, sunY + ry * sunR * 0.5);
+      ctx.lineTo(W, sunY + ry * sunR * 1.6);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // ---- Moon orbit ring ----
+    ctx.beginPath();
+    ctx.arc(cx, cy, L.orbitR, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(125,180,255,0.30)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // ---- Earth ----
+    // Sunlight comes from the left, so Earth's left half is day.
+    drawWorld(cx, cy, L.earthR, true, time);
+
+    // ---- Moon position ----
+    // angle measured from the Sun direction (toward -x = toward Sun).
+    // angle 0 => Moon between Earth and Sun (to the LEFT of Earth).
+    var mx = cx - Math.cos(angle) * L.orbitR;
+    var my = cy - Math.sin(angle) * L.orbitR;
+
+    drawWorld(mx, my, L.moonR, false, time);
+
+    // sunlight direction arrow near moon (toward where light comes from)
+    // (kept subtle)
+
+    // ---- inset: Moon as seen from Earth ----
+    var ph = phaseInfo(angle);
+    drawInset(ph, time);
+
+    // connecting glow line Earth->Moon
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = "#7db4ff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(mx, my);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // draws a lit/dark world (Earth or Moon). Light comes from the left (Sun).
+  // isEarth: tints day/night differently.
+  function drawWorld(x, y, r, isEarth, time) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.clip();
+
+    // night side base
+    ctx.fillStyle = isEarth ? "#10254a" : "#2a2f44";
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+    // day side: a circle of light offset toward the Sun (left)
+    var lit = ctx.createRadialGradient(
+      x - r * 0.55, y, r * 0.2,
+      x - r * 0.55, y, r * 2.0);
+    if (isEarth) {
+      lit.addColorStop(0, "#7fd0ff");
+      lit.addColorStop(0.5, "#3a8fd6");
+      lit.addColorStop(1, "rgba(58,143,214,0)");
+    } else {
+      lit.addColorStop(0, "#fff7d6");
+      lit.addColorStop(0.5, "#e6d9a8");
+      lit.addColorStop(1, "rgba(230,217,168,0)");
+    }
+    ctx.fillStyle = lit;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+    if (isEarth) {
+      // simple continents blobs (decorative, day side greenish)
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#3fae6b";
+      var blobs = [
+        [-0.35, -0.35, 0.4], [-0.1, 0.3, 0.5], [0.3, -0.1, 0.35]
+      ];
+      for (var i = 0; i < blobs.length; i++) {
+        ctx.beginPath();
+        ctx.arc(x + blobs[i][0] * r, y + blobs[i][1] * r, blobs[i][2] * r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    } else {
+      // moon craters
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = "#9b8f6e";
+      var cr = [[-0.2, -0.25, 0.22], [0.25, 0.1, 0.18], [-0.05, 0.35, 0.14]];
+      for (var j = 0; j < cr.length; j++) {
+        ctx.beginPath();
+        ctx.arc(x + cr[j][0] * r, y + cr[j][1] * r, cr[j][2] * r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+
+    // glow ring
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = isEarth ? "rgba(127,208,255,0.6)" : "rgba(255,247,214,0.6)";
+    ctx.lineWidth = isEarth ? 2.5 : 2;
+    ctx.stroke();
+
+    // labels
+    ctx.fillStyle = "rgba(234,241,255,0.95)";
+    ctx.font = "600 " + Math.max(13, r * 0.42) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(isEarth ? "Earth" : "Moon", x, y - r - 6);
+    ctx.textBaseline = "alphabetic";
+  }
+
+  // the inset showing the phase as seen from Earth
+  function drawInset(ph, time) {
+    var pad = clamp(12, W * 0.03, 22);
+    var size = clamp(96, Math.min(W, H) * 0.26, 180);
+    var ix = pad;
+    var iy = clamp(70, H * 0.16, 110);
+
+    // panel
+    roundRect(ix, iy, size, size + 38, 16);
+    ctx.fillStyle = "rgba(18,26,52,0.9)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(125,180,255,0.34)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // "From Earth" label
+    ctx.fillStyle = "#9fb2da";
+    ctx.font = "600 " + clamp(12, size * 0.13, 15) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("From Earth you see", ix + size / 2, iy + clamp(16, size * 0.16, 22));
+
+    // the moon disk
+    var mr = size * 0.32;
+    var mcx = ix + size / 2;
+    var mcy = iy + size * 0.52;
+    // soft glow behind
+    var gl = ctx.createRadialGradient(mcx, mcy, 0, mcx, mcy, mr * 2);
+    gl.addColorStop(0, "rgba(255,240,190," + (0.15 + ph.illum * 0.4) + ")");
+    gl.addColorStop(1, "rgba(255,240,190,0)");
+    ctx.fillStyle = gl;
+    ctx.beginPath();
+    ctx.arc(mcx, mcy, mr * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawMoonDisk(mcx, mcy, mr, ph.illum, ph.waxing);
+
+    // phase name
+    ctx.fillStyle = "#ffd166";
+    ctx.font = "700 " + clamp(14, size * 0.155, 19) + "px system-ui, sans-serif";
+    ctx.fillText(ph.name, ix + size / 2, iy + size + 22);
+    ctx.textAlign = "left";
+  }
+
+  // ---- small helpers ----
+  function clamp(lo, v, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---- main loop ----
+  var lastTime = 0;
+  function frame(time) {
+    var dt = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
+    lastTime = time;
+
+    if (playing && !dragging) {
+      angle += SPEED * dt;
+      if (angle > Math.PI * 2) angle -= Math.PI * 2;
+      syncSlider();
+    }
+    draw(time);
+    requestAnimationFrame(frame);
+  }
+
+  function syncSlider() {
+    var t = angle % (Math.PI * 2);
+    if (t < 0) t += Math.PI * 2;
+    slider.value = String(Math.round((t / (Math.PI * 2)) * SLIDER_MAX));
+  }
+
+  // ---- input: drag the moon ----
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function moonScreenPos() {
+    var L = layout();
+    return {
+      x: L.cx - Math.cos(angle) * L.orbitR,
+      y: L.cy - Math.sin(angle) * L.orbitR,
+      r: L.moonR, cx: L.cx, cy: L.cy
+    };
+  }
+
+  function setAngleFromPoint(px, py) {
+    var L = layout();
+    var dx = px - L.cx;
+    var dy = py - L.cy;
+    // screen angle of pointer from Earth
+    var sa = Math.atan2(dy, dx);
+    // moon at orbit: mx = cx - cos(angle)*R => direction (cos = -dx/R...)
+    // we want angle such that (-cos(angle), -sin(angle)) points to pointer
+    angle = Math.atan2(-dy, -dx);
+    if (angle < 0) angle += Math.PI * 2;
+    syncSlider();
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    var m = moonScreenPos();
+    var dx = pt.x - m.x, dy = pt.y - m.y;
+    var grab = Math.max(m.r + 24, 34);
+    if (dx * dx + dy * dy <= grab * grab) {
+      dragging = true;
+      dragPointerId = e.pointerId;
+      setAngleFromPoint(pt.x, pt.y);
+      if (canvas.setPointerCapture) {
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+    } else {
+      // tapping elsewhere on the orbit also moves the moon there
+      var ddx = pt.x - m.cx, ddy = pt.y - m.cy;
+      var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      var L = layout();
+      if (dist > L.orbitR * 0.45) {
+        dragging = true;
+        dragPointerId = e.pointerId;
+        setAngleFromPoint(pt.x, pt.y);
+        if (canvas.setPointerCapture) {
+          try { canvas.setPointerCapture(e.pointerId); } catch (err2) {}
+        }
+      }
+    }
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    setAngleFromPoint(pt.x, pt.y);
+  });
+
+  function endDrag(e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    dragging = false;
+    dragPointerId = null;
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  // ---- slider ----
+  slider.addEventListener("input", function () {
+    angle = (parseFloat(slider.value) / SLIDER_MAX) * Math.PI * 2;
+  });
+
+  // ---- buttons ----
+  playBtn.addEventListener("click", function () {
+    playing = !playing;
+    playBtn.textContent = playing ? "⏸ Pause" : "▶ Play";
+  });
+
+  resetBtn.addEventListener("click", function () {
+    angle = Math.PI * 0.25;
+    playing = true;
+    playBtn.textContent = "⏸ Pause";
+    syncSlider();
+  });
+
+  howBtn.addEventListener("click", function () {
+    howPanel.classList.toggle("open");
+  });
+
+  // ---- boot ----
+  window.addEventListener("resize", resize);
+  resize();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () {
+    stage.classList.add("ready");
+  });
+})();
+</script>
+</body>
+</html>

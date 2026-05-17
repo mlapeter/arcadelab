@@ -14,6 +14,8 @@ async function getGames() {
     .from("games")
     .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url")
     .eq("status", "active")
+    // Default view is "Best" — quality_score, with newest as the tiebreaker.
+    .order("quality_score", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(40);
 

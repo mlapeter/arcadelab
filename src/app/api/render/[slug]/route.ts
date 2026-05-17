@@ -15,7 +15,11 @@ export async function GET(
     .eq("slug", slug)
     .single();
 
-  if (!game || game.status !== "active") {
+  // 'hidden' and 'pending' games stay playable by direct link (the creator's
+  // URL never breaks); only 'removed' games — and anything unrecognized —
+  // 404. Discovery surfaces still filter to status === 'active' elsewhere.
+  const PLAYABLE_STATUSES = ["active", "pending", "hidden"];
+  if (!game || !PLAYABLE_STATUSES.includes(game.status)) {
     return new NextResponse("Game not found", { status: 404 });
   }
 

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { authenticateCreator } from "@/lib/auth";
 import { scanGameContent, MAX_HTML_SIZE, MAX_TITLE_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/safety";
+import { moderateContent, applyModeration } from "@/lib/moderation";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
 import { VALID_COLORS, type GameColor } from "@/lib/parse-game";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
@@ -145,6 +146,17 @@ export async function PUT(
     if (gameError) {
       return NextResponse.json({ error: "Failed to update game" }, { status: 500 });
     }
+
+    // Re-moderate after the response — closes the publish-clean-then-edit-to-scam
+    // gap. A non-"safe" verdict auto-shadow-hides the updated game.
+    after(async () => {
+      const result = await moderateContent({
+        title: updatedGame.title,
+        description: description ?? null,
+        html,
+      });
+      if (result) await applyModeration(game.id, result);
+    });
 
     return NextResponse.json({
       id: updatedGame.id,

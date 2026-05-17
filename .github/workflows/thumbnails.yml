@@ -1,0 +1,48 @@
+# Captures still + preview-video thumbnails for any game missing media.
+# Runs the same scripts/capture-thumbnails.mjs we run locally — a GitHub-hosted
+# Ubuntu runner has full Chromium, so no serverless-Chromium rewrite is needed.
+# The script is incremental: it skips games that already have media.
+name: Game thumbnails
+
+on:
+  schedule:
+    # Daily at 06:00 UTC (just after midnight Mountain) — low-traffic window.
+    - cron: "0 6 * * *"
+  workflow_dispatch: # allow manual runs from the Actions tab
+
+# Don't let a slow run overlap the next scheduled one.
+concurrency:
+  group: game-thumbnails
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      # The capture script reads Supabase credentials from .env.local
+      # (standalone scripts don't get Next.js's env loading).
+      - name: Write .env.local
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}"
+            echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
+          } > .env.local
+
+      - name: Capture missing thumbnails
+        run: npm run thumbnails

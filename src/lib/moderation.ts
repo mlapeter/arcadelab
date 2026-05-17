@@ -122,6 +122,10 @@ function parseResult(text: string): ModerationResult | null {
   }
 }
 
+// Base quality contribution to a game's /play ranking score. Engagement
+// (plays, likes) is layered on top by the rescore pass in moderate-games.mjs.
+const QUALITY_BASE: Record<string, number> = { good: 3, basic: 1, broken: -3 };
+
 /**
  * Records a moderation result on a game. A non-"safe" verdict auto-shadow-hides
  * the game (still playable by link, off all discovery) for owner review — but
@@ -132,6 +136,7 @@ export async function applyModeration(gameId: string, result: ModerationResult) 
     .from("games")
     .update({
       moderation: { ...result, model: MODEL, checked_at: new Date().toISOString() },
+      quality_score: QUALITY_BASE[result.quality] ?? 1,
     })
     .eq("id", gameId);
 

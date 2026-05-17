@@ -4,10 +4,10 @@ import { useState } from "react";
 import type { Game } from "@/lib/types";
 import GameGrid from "@/components/GameGrid";
 
-type SortOption = "newest" | "popular" | "liked";
+type SortOption = "best" | "newest" | "popular" | "liked";
 
 export default function GameBrowser({ initialGames }: { initialGames: Game[] }) {
-  const [sort, setSort] = useState<SortOption>("newest");
+  const [sort, setSort] = useState<SortOption>("best");
   const [games, setGames] = useState<Game[]>(initialGames);
   const [loading, setLoading] = useState(false);
 
@@ -30,6 +30,7 @@ export default function GameBrowser({ initialGames }: { initialGames: Game[] }) 
   }
 
   const tabs: { key: SortOption; label: string; icon: string }[] = [
+    { key: "best", label: "Best", icon: "🏆" },
     { key: "newest", label: "New", icon: "✨" },
     { key: "popular", label: "Popular", icon: "🔥" },
     { key: "liked", label: "Starred", icon: "⭐" },

@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
   let orderColumn = "created_at";
   if (sort === "popular") orderColumn = "play_count";
   if (sort === "liked") orderColumn = "like_count";
+  if (sort === "best") orderColumn = "quality_score";
 
   const { data: games, error, count } = await supabase
     .from("games")

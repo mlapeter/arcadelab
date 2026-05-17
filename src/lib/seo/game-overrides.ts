@@ -452,6 +452,38 @@ export const GAME_OVERRIDES: Record<string, GameSeoOverride> = {
     ],
     featured: true,
   },
+  "steam-engine-arcadelab": {
+    longDescription:
+      "A see-through steam engine kids can run themselves. Slide the heat up and a fire glows under the boiler, water bubbles into steam, the steam shoves a piston back and forth, and a connecting rod spins a giant flywheel. The whole chain — heat to steam to motion — happens right in front of you, and the flywheel speeds up or slows down as you change the fire. It's a friendly introduction to how engines turned heat into power and started the Industrial Revolution.",
+    educationalTopics: [
+      "steam engine",
+      "energy transformation",
+      "heat energy",
+      "pistons and crankshafts",
+      "Industrial Revolution",
+      "physics",
+    ],
+    learningResourceType: "Simulation",
+    educationalLevel: "Elementary School",
+    faqs: [
+      {
+        question: "How does a steam engine work?",
+        answer:
+          "A fire heats water in a boiler until it turns into steam. Steam takes up much more space than water, so it pushes hard on a piston. The piston is linked by a rod to a crankshaft, which turns the back-and-forth push into spinning motion that drives a flywheel.",
+      },
+      {
+        question: "Why does the flywheel spin faster with more heat?",
+        answer:
+          "More heat boils the water faster and makes more steam, so the piston gets pushed harder and more often. That extra push speeds up the flywheel. Turn the heat down and the engine slows; turn it off and it stops.",
+      },
+      {
+        question: "What does the heat slider do?",
+        answer:
+          "The heat slider controls the fire. At zero the engine is cold and still. As you slide it up you see more flames, more steam, and a faster flywheel — a clear picture of heat energy becoming motion.",
+      },
+    ],
+    featured: true,
+  },
 };
 
 export function getGameOverride(slug: string): GameSeoOverride | undefined {

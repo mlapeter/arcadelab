@@ -1,0 +1,816 @@
+<!--ARCADELAB
+title: Pulley Lifter
+description: A hands-on machines sandbox — thread 1, 2, or 3 pulleys, then drag the rope to lift a heavy crate and feel how more pulleys trade extra rope for an easier pull.
+emoji: 🏗️
+color: teal
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pulley Lifter</title>
+<style>
+  :root {
+    --bg: #04161a;
+    --panel: rgba(8, 42, 48, 0.86);
+    --accent: #2fd6c4;
+    --accent2: #7af0dd;
+    --text: #e6fffb;
+    --muted: #9ed6cf;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    letter-spacing: 0.2px;
+    background: var(--panel);
+    border: 1px solid rgba(47, 214, 196, 0.30);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(14px, 3.6vw, 16px);
+    font-weight: 700;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(47, 214, 196, 0.34);
+    border-radius: 13px;
+    padding: 11px 15px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(14, 64, 70, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  button.on {
+    background: linear-gradient(180deg, #2fd6c4, #14a394);
+    color: #04231f;
+    border-color: var(--accent2);
+  }
+  .pgroup {
+    display: flex;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid rgba(47, 214, 196, 0.30);
+    border-radius: 15px;
+    padding: 5px;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .pgroup button {
+    background: transparent;
+    border: none;
+    min-width: 46px;
+    padding: 9px 12px;
+  }
+  .pgroup button:hover { background: rgba(47, 214, 196, 0.18); }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(47, 214, 196, 0.22);
+    border-radius: 13px;
+    padding: 8px 14px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #howBtn { pointer-events: auto; }
+  #howPanel {
+    pointer-events: auto;
+    display: none;
+    background: var(--panel);
+    border: 1px solid rgba(47, 214, 196, 0.30);
+    border-radius: 14px;
+    padding: 14px 16px;
+    max-width: min(440px, 92vw);
+    font-size: clamp(13px, 3.5vw, 15px);
+    line-height: 1.5;
+    color: var(--text);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #howPanel.show { display: block; }
+  #howPanel h3 { margin: 0 0 6px; font-size: 1.05em; color: var(--accent2); }
+  #howPanel p { margin: 6px 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🏗️</span><span>Pulley Lifter</span></div>
+  <div class="spacer"></div>
+  <div class="pgroup">
+    <button id="p1" type="button">1</button>
+    <button id="p2" type="button">2</button>
+    <button id="p3" type="button">3</button>
+  </div>
+  <div class="controls">
+    <button id="reset" type="button">Reset</button>
+  </div>
+</div>
+
+<div id="info">
+  <div id="howPanel">
+    <h3>How it works</h3>
+    <p>A pulley is a wheel that changes the way you pull a rope.</p>
+    <p>With more pulleys sharing the load, you pull with <b>less force</b> — but you must pull <b>more rope</b> to lift the crate the same height.</p>
+    <p>2 pulleys = half the pull. 3 pulleys = a third of the pull. Machines trade effort for distance!</p>
+  </div>
+  <div id="hint">Drag the orange rope handle down to lift the crate</div>
+  <button id="howBtn" type="button">How it works</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var hintEl = document.getElementById("hint");
+
+  var W = 0, H = 0, DPR = 1;
+
+  // ---- simulation state ----
+  var nPulleys = 2;          // 1, 2, or 3
+  var lift = 0;              // crate lift fraction 0..1 (0 = floor, 1 = top)
+  var liftVel = 0;           // smoothing velocity for the crate
+  var ropePulled = 0;        // total rope length consumed by current lift (px-ish)
+
+  // dragging the rope handle
+  var dragging = false;
+  var dragPointerId = null;
+  var dragStartY = 0;        // pointer y at grab
+  var dragStartLift = 0;     // lift value at grab
+  var handleHotR = 46;       // generous tap radius
+
+  // pulse for "lifted" celebration
+  var celebrate = 0;
+
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  // ---- layout / resize ----
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+
+  // ---- geometry helpers (computed each frame from W/H) ----
+  // Returns the layout object describing where everything is drawn.
+  function layout() {
+    var narrow = W < 560;
+    // bottom space reserved for the HTML hint + "How it works" controls
+    var bottomInset = narrow ? 118 : 92;
+    // meters panel size
+    var panelW = narrow ? clamp(W - 28, 200, 340) : clamp(W * 0.42, 168, 240);
+    var panelH = narrow ? 96 : 132;
+
+    var topY = Math.max(86, H * 0.15);          // ceiling beam y
+    // floor leaves room below for the meters panel + bottom HTML controls
+    var floorY = H - bottomInset - panelH - 18;
+    floorY = clamp(floorY, topY + 220, H * 0.82);
+    var travel = floorY - topY - 150;            // how far the crate can rise
+    travel = Math.max(80, travel);
+
+    var crateSize = clamp(Math.min(W, H) * 0.20, 64, 150);
+    var pulleyR = clamp(Math.min(W, H) * 0.045, 15, 30);
+
+    // crate centered horizontally a bit left of middle
+    var crateCX = narrow ? W * 0.36 : W * 0.40;
+    var crateTopY = floorY - crateSize - lift * travel;  // top of crate
+    var crateCY = crateTopY + crateSize / 2;
+
+    // fixed (ceiling) pulleys spread to the right of the crate
+    var fixedCX = narrow ? W * 0.60 : W * 0.66;
+    // moving block sits just above the crate
+    var movingCX = crateCX;
+    var movingY = crateTopY - pulleyR - 14;
+
+    // the "effort" rope hangs down on the right, kept clear of the edge
+    var handleHalf = 30;
+    var pullX = clamp(W * 0.86, fixedCX + pulleyR * 2 + 34, W - handleHalf - 14);
+
+    return {
+      narrow: narrow, bottomInset: bottomInset,
+      panelW: panelW, panelH: panelH,
+      topY: topY, floorY: floorY, travel: travel,
+      crateSize: crateSize, pulleyR: pulleyR,
+      crateCX: crateCX, crateCY: crateCY, crateTopY: crateTopY,
+      fixedCX: fixedCX, movingCX: movingCX, movingY: movingY,
+      pullX: pullX
+    };
+  }
+
+  // The rope handle position depends on how much rope is pulled.
+  // More pulleys => the handle travels nPulleys x as far for the same lift.
+  function handlePos(L) {
+    var travelLen = L.floorY - L.topY - 130;
+    travelLen = Math.max(60, travelLen);
+    // resting handle position near the top of the pull rope
+    var restY = L.topY + L.pulleyR + 18;
+    var hy = restY + lift * travelLen * nPulleys;
+    // keep handle on screen
+    var maxY = L.floorY - 30;
+    hy = clamp(hy, restY, maxY);
+    return { x: L.pullX, y: hy, restY: restY, travelLen: travelLen };
+  }
+
+  // ---- physics-ish update ----
+  function update(dt) {
+    // smooth the crate toward target lift
+    var target = lift;
+    // (lift itself is set by dragging; here we just animate celebrate)
+    if (celebrate > 0) celebrate = Math.max(0, celebrate - dt);
+  }
+
+  // ---- rendering ----
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawPulley(x, y, r, spin) {
+    // outer wheel
+    var g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r);
+    g.addColorStop(0, "#cdeeea");
+    g.addColorStop(1, "#5a8f89");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // rim
+    ctx.lineWidth = Math.max(2, r * 0.16);
+    ctx.strokeStyle = "#2fd6c4";
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    // groove ring
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.strokeStyle = "rgba(4,35,32,0.45)";
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    // spinning hub spokes
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(spin);
+    ctx.strokeStyle = "rgba(4,35,32,0.55)";
+    ctx.lineWidth = Math.max(2, r * 0.13);
+    ctx.lineCap = "round";
+    for (var i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(r * 0.55, 0);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // center bolt
+    ctx.fillStyle = "#04231f";
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // draw a rope segment with a soft highlight
+  function ropeSeg(ax, ay, bx, by) {
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#f4a23c";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,230,180,0.7)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+  }
+
+  var spin = 0;
+
+  function draw(time) {
+    // background
+    ctx.fillStyle = "#04161a";
+    ctx.fillRect(0, 0, W, H);
+    var gg = ctx.createRadialGradient(W * 0.5, H * 0.3, 0, W * 0.5, H * 0.3, Math.max(W, H));
+    gg.addColorStop(0, "rgba(20,80,86,0.55)");
+    gg.addColorStop(1, "rgba(4,16,19,0)");
+    ctx.fillStyle = gg;
+    ctx.fillRect(0, 0, W, H);
+
+    var L = layout();
+    var hp = handlePos(L);
+
+    // ---- floor ----
+    ctx.fillStyle = "#0a3038";
+    ctx.fillRect(0, L.floorY, W, H - L.floorY);
+    ctx.strokeStyle = "rgba(47,214,196,0.35)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(0, L.floorY);
+    ctx.lineTo(W, L.floorY);
+    ctx.stroke();
+
+    // ---- ceiling beam ----
+    ctx.fillStyle = "#0a3038";
+    roundRect(W * 0.06, L.topY - 22, W * 0.88, 22, 6);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(47,214,196,0.4)";
+    ctx.lineWidth = 2;
+    roundRect(W * 0.06, L.topY - 22, W * 0.88, 22, 6);
+    ctx.stroke();
+    // beam rivets
+    ctx.fillStyle = "rgba(47,214,196,0.45)";
+    for (var rv = 0; rv < 9; rv++) {
+      var rx = W * 0.10 + rv * (W * 0.80 / 8);
+      ctx.beginPath();
+      ctx.arc(rx, L.topY - 11, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ---- compute pulley positions ----
+    // fixed pulleys hang from the ceiling near fixedCX
+    var fixed = [];
+    var moving = [];
+    var gap = L.pulleyR * 2.4;
+    var nFixed = nPulleys;                 // fixed (top) pulleys
+    var nMoving = nPulleys - 1;            // moving (bottom) pulleys
+    var i;
+    for (i = 0; i < nFixed; i++) {
+      fixed.push({ x: L.fixedCX + (i - (nFixed - 1) / 2) * gap, y: L.topY + L.pulleyR });
+    }
+    for (i = 0; i < nMoving; i++) {
+      moving.push({ x: L.movingCX + (i - (nMoving - 1) / 2) * gap * 0.7, y: L.movingY });
+    }
+
+    // ---- the crate hangs from the moving block (or directly from a fixed pulley for n=1) ----
+    var cs = L.crateSize;
+    var cx = L.crateCX;
+    var crateTop = L.crateTopY;
+
+    // ---- draw rope threading ----
+    // For n pulleys the rope path:
+    //  - one end anchored to ceiling (n>=2) or it's a simple loop for n=1
+    //  - threads alternately around moving and fixed pulleys
+    //  - free end goes over the last fixed pulley and down to the handle
+    if (nPulleys === 1) {
+      // single fixed pulley: rope from crate up over pulley, down to handle
+      var fp = fixed[0];
+      // crate attachment point
+      ropeSeg(cx, crateTop, fp.x - L.pulleyR, fp.y);
+      // around the pulley (arc)
+      ctx.strokeStyle = "#f4a23c";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y, L.pulleyR, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      // down to handle
+      ropeSeg(fp.x + L.pulleyR, fp.y, hp.x, hp.y);
+    } else {
+      // n>=2: anchor on ceiling, zigzag through moving + fixed pulleys
+      var anchorX = L.movingCX - cs * 0.5 - 6;
+      var anchorY = L.topY;
+      // build the list of contact points in order
+      // anchor -> moving[0] -> fixed[0] -> moving[1] -> fixed[1] ... -> last fixed -> handle
+      var prevX = anchorX, prevY = anchorY;
+      // anchor block on ceiling
+      ctx.fillStyle = "#0a3038";
+      roundRect(anchorX - 9, anchorY - 4, 18, 12, 3);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(47,214,196,0.5)";
+      ctx.lineWidth = 2;
+      roundRect(anchorX - 9, anchorY - 4, 18, 12, 3);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#f4a23c";
+      var step;
+      // sequence of pulleys: alternate moving / fixed
+      var seq = [];
+      for (i = 0; i < nMoving; i++) {
+        seq.push(moving[i]);
+        if (i < nFixed) seq.push(fixed[i]);
+      }
+      // any remaining fixed pulleys
+      // (with nFixed = nMoving + 1, exactly one fixed pulley remains)
+      // it is fixed[nFixed-1]
+      // draw straight rope between consecutive contact points, and arcs around pulleys
+      // segment: anchor -> moving[0] left side
+      for (step = 0; step < seq.length; step++) {
+        var pu = seq[step];
+        var isMoving = (pu.y === L.movingY);
+        // approach side: rope comes from prev; leaves toward next.
+        // we just draw a tangent line to pulley side and a wrap arc.
+        // determine which side rope touches based on direction
+        var fromLeft = prevX < pu.x;
+        var sideX = pu.x + (fromLeft ? -L.pulleyR : L.pulleyR);
+        ropeSeg(prevX, prevY, sideX, pu.y);
+        // wrap arc around the pulley (half loop)
+        ctx.strokeStyle = "#f4a23c";
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        if (isMoving) {
+          // moving pulley: rope wraps the BOTTOM half
+          ctx.arc(pu.x, pu.y, L.pulleyR, 0, Math.PI);
+        } else {
+          // fixed pulley: rope wraps the TOP half
+          ctx.arc(pu.x, pu.y, L.pulleyR, Math.PI, Math.PI * 2);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,230,180,0.6)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (isMoving) ctx.arc(pu.x, pu.y, L.pulleyR, 0, Math.PI);
+        else ctx.arc(pu.x, pu.y, L.pulleyR, Math.PI, Math.PI * 2);
+        ctx.stroke();
+        // exit side
+        prevX = pu.x + (fromLeft ? L.pulleyR : -L.pulleyR);
+        prevY = pu.y;
+      }
+      // from the last contact point, go to the last fixed pulley, then down to handle
+      var lastFixed = fixed[nFixed - 1];
+      var fromLeft2 = prevX < lastFixed.x;
+      var sideX2 = lastFixed.x + (fromLeft2 ? -L.pulleyR : L.pulleyR);
+      ropeSeg(prevX, prevY, sideX2, lastFixed.y);
+      ctx.strokeStyle = "#f4a23c";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(lastFixed.x, lastFixed.y, L.pulleyR, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      // down to handle
+      ropeSeg(lastFixed.x + L.pulleyR, lastFixed.y, hp.x, hp.y);
+
+      // rope from moving block down to the crate
+      for (i = 0; i < nMoving; i++) {
+        ropeSeg(moving[i].x, moving[i].y + L.pulleyR, moving[i].x, crateTop);
+      }
+    }
+
+    // ---- moving block bar (connects moving pulleys) ----
+    if (nMoving >= 1) {
+      var mLx = moving[0].x, mRx = moving[nMoving - 1].x;
+      ctx.strokeStyle = "#2fd6c4";
+      ctx.lineWidth = 5;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(mLx, L.movingY);
+      ctx.lineTo(mRx, L.movingY);
+      ctx.stroke();
+    }
+
+    // ---- draw pulleys ----
+    spin += 0.02;
+    for (i = 0; i < fixed.length; i++) drawPulley(fixed[i].x, fixed[i].y, L.pulleyR, spin);
+    for (i = 0; i < moving.length; i++) drawPulley(moving[i].x, moving[i].y, L.pulleyR, -spin);
+
+    // ---- the crate ----
+    var crateGrad = ctx.createLinearGradient(cx - cs / 2, crateTop, cx + cs / 2, crateTop + cs);
+    crateGrad.addColorStop(0, "#d98c2e");
+    crateGrad.addColorStop(1, "#a85f12");
+    ctx.fillStyle = crateGrad;
+    roundRect(cx - cs / 2, crateTop, cs, cs, 12);
+    ctx.fill();
+    ctx.strokeStyle = "#ffd089";
+    ctx.lineWidth = 3;
+    roundRect(cx - cs / 2, crateTop, cs, cs, 12);
+    ctx.stroke();
+    // crate cross planks
+    ctx.strokeStyle = "rgba(255,225,170,0.55)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(cx - cs / 2 + 8, crateTop + 8);
+    ctx.lineTo(cx + cs / 2 - 8, crateTop + cs - 8);
+    ctx.moveTo(cx + cs / 2 - 8, crateTop + 8);
+    ctx.lineTo(cx - cs / 2 + 8, crateTop + cs - 8);
+    ctx.stroke();
+    // weight label
+    ctx.fillStyle = "#fff4e0";
+    ctx.font = "700 " + Math.round(cs * 0.20) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("100", cx, crateTop + cs * 0.42);
+    ctx.font = "700 " + Math.round(cs * 0.13) + "px system-ui, sans-serif";
+    ctx.fillText("KG", cx, crateTop + cs * 0.66);
+
+    // celebration sparkle when fully lifted
+    if (lift > 0.97) {
+      celebrate = 0.6;
+    }
+    if (celebrate > 0) {
+      ctx.fillStyle = "rgba(122,240,221," + (celebrate * 0.9) + ")";
+      for (i = 0; i < 7; i++) {
+        var a = (time * 0.004) + i * (Math.PI * 2 / 7);
+        var sr = cs * 0.7 + (0.6 - celebrate) * 60;
+        var sx = cx + Math.cos(a) * sr;
+        var sy = crateTop + cs * 0.4 + Math.sin(a) * sr;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ---- the rope handle (drag target) ----
+    var hglow = dragging ? 1 : 0.55 + 0.25 * Math.sin(time * 0.005);
+    var hg = ctx.createRadialGradient(hp.x, hp.y, 0, hp.x, hp.y, 34);
+    hg.addColorStop(0, "rgba(244,162,60," + (0.55 * hglow) + ")");
+    hg.addColorStop(1, "rgba(244,162,60,0)");
+    ctx.fillStyle = hg;
+    ctx.beginPath();
+    ctx.arc(hp.x, hp.y, 34, 0, Math.PI * 2);
+    ctx.fill();
+    // handle bar
+    var hw = 56, hh = 22;
+    var handleGrad = ctx.createLinearGradient(0, hp.y - hh / 2, 0, hp.y + hh / 2);
+    handleGrad.addColorStop(0, "#ffce7a");
+    handleGrad.addColorStop(1, "#e07f1c");
+    ctx.fillStyle = handleGrad;
+    roundRect(hp.x - hw / 2, hp.y - hh / 2, hw, hh, 11);
+    ctx.fill();
+    ctx.strokeStyle = "#fff0d4";
+    ctx.lineWidth = 2.5;
+    roundRect(hp.x - hw / 2, hp.y - hh / 2, hw, hh, 11);
+    ctx.stroke();
+    // grip lines
+    ctx.strokeStyle = "rgba(80,40,0,0.5)";
+    ctx.lineWidth = 3;
+    for (i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(hp.x + i * 11, hp.y - hh / 2 + 5);
+      ctx.lineTo(hp.x + i * 11, hp.y + hh / 2 - 5);
+      ctx.stroke();
+    }
+    // down arrow hint when not dragging and not lifted
+    if (!dragging && lift < 0.04) {
+      var ay = hp.y + 30 + 5 * Math.sin(time * 0.006);
+      ctx.fillStyle = "rgba(244,162,60,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(hp.x, ay + 12);
+      ctx.lineTo(hp.x - 9, ay);
+      ctx.lineTo(hp.x + 9, ay);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ---- meters panel (bottom-left, drawn on canvas) ----
+    drawMeters(L, time);
+  }
+
+  function drawMeters(L, time) {
+    var panelW = L.panelW;
+    var panelH = L.panelH;
+    // panel sits in the band between the floor and the bottom HTML controls
+    var px = L.narrow ? (W - panelW) / 2 : 14;
+    var bandTop = L.floorY + 8;
+    var bandBot = H - L.bottomInset - 6;
+    var py = bandTop + Math.max(0, (bandBot - bandTop - panelH) / 2);
+    if (py + panelH > bandBot) py = bandBot - panelH;
+    if (py < L.floorY + 6) py = L.floorY + 6;
+
+    // panel bg
+    ctx.fillStyle = "rgba(8,42,48,0.92)";
+    roundRect(px, py, panelW, panelH, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(47,214,196,0.3)";
+    ctx.lineWidth = 1.5;
+    roundRect(px, py, panelW, panelH, 14);
+    ctx.stroke();
+
+    var force = 1 / nPulleys;          // fraction of load you must pull
+    var ropeFactor = nPulleys;         // rope used per unit lift
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+
+    var labelSize = clamp(W * 0.035, 12, 15);
+    var valSize = clamp(W * 0.032, 11, 14);
+    var effColor = force > 0.8 ? "#ff6b5e" : (force > 0.4 ? "#f4a23c" : "#2fd6c4");
+    var ropeFrac = clamp(lift * ropeFactor / 3, 0, 1);
+
+    if (L.narrow) {
+      // two meters side by side
+      var colW = (panelW - 14 * 3) / 2;
+      drawMeter(px + 14, py, colW, "EFFORT",
+        force, effColor, Math.round(force * 100) + " kg", "#e6fffb",
+        labelSize, valSize);
+      drawMeter(px + 14 * 2 + colW, py, colW, "ROPE PULLED",
+        ropeFrac, "#7af0dd", "x" + nPulleys + " rope", "#04231f",
+        labelSize, valSize);
+    } else {
+      // two meters stacked
+      drawMeter(px + 14, py + 4, panelW - 28, "EFFORT (your pull)",
+        force, effColor, Math.round(force * 100) + " kg pull", "#e6fffb",
+        labelSize, valSize);
+      drawMeter(px + 14, py + panelH / 2 + 4, panelW - 28, "ROPE PULLED",
+        ropeFrac, "#7af0dd", "x" + nPulleys + " rope", "#04231f",
+        labelSize, valSize);
+    }
+  }
+
+  // draw one labelled bar meter; (bx,by) is the top-left of the meter block
+  function drawMeter(bx, by, bw, label, frac, color, valText, valColor, labelSize, valSize) {
+    var barH = 16;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#9ed6cf";
+    ctx.font = "700 " + labelSize + "px system-ui, sans-serif";
+    ctx.fillText(label, bx, by + 20);
+    var barY = by + 30;
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    roundRect(bx, barY, bw, barH, 8);
+    ctx.fill();
+    ctx.fillStyle = color;
+    roundRect(bx, barY, Math.max(barH, bw * frac), barH, 8);
+    ctx.fill();
+    ctx.fillStyle = valColor;
+    ctx.font = "700 " + valSize + "px system-ui, sans-serif";
+    ctx.fillText(valText, bx + 6, barY + barH - 3);
+  }
+
+  // ---- main loop ----
+  var lastT = 0;
+  function frame(time) {
+    var dt = (time - lastT) / 1000;
+    if (dt > 0.05) dt = 0.05;
+    if (dt < 0) dt = 0;
+    lastT = time;
+    update(dt);
+    draw(time);
+    requestAnimationFrame(frame);
+  }
+
+  // ---- input ----
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (dragging) return;
+    var pt = pointFromEvent(e);
+    var L = layout();
+    var hp = handlePos(L);
+    var dx = pt.x - hp.x, dy = pt.y - hp.y;
+    if (dx * dx + dy * dy <= handleHotR * handleHotR) {
+      dragging = true;
+      dragPointerId = e.pointerId;
+      dragStartY = pt.y;
+      dragStartLift = lift;
+      if (canvas.setPointerCapture) {
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+      }
+    }
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    var L = layout();
+    var hp = handlePos(L);
+    // moving the handle down by `travelLen * nPulleys` raises crate fully.
+    var dyTotal = pt.y - dragStartY;
+    var fullPull = hp.travelLen * nPulleys;
+    var deltaLift = dyTotal / fullPull;
+    lift = clamp(dragStartLift + deltaLift, 0, 1);
+  });
+
+  function endDrag(e) {
+    if (!dragging || e.pointerId !== dragPointerId) return;
+    e.preventDefault();
+    dragging = false;
+    dragPointerId = null;
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  // ---- pulley count buttons ----
+  var pBtns = [
+    document.getElementById("p1"),
+    document.getElementById("p2"),
+    document.getElementById("p3")
+  ];
+  function setPulleys(n) {
+    nPulleys = n;
+    for (var i = 0; i < pBtns.length; i++) {
+      if (pBtns[i]) pBtns[i].classList.toggle("on", (i + 1) === n);
+    }
+    var msg = n === 1 ? "1 pulley: hard pull, but short rope"
+      : n === 2 ? "2 pulleys: half the pull, double the rope"
+      : "3 pulleys: easy pull, but lots of rope!";
+    hintEl.textContent = msg;
+  }
+  if (pBtns[0]) pBtns[0].addEventListener("click", function () { setPulleys(1); });
+  if (pBtns[1]) pBtns[1].addEventListener("click", function () { setPulleys(2); });
+  if (pBtns[2]) pBtns[2].addEventListener("click", function () { setPulleys(3); });
+
+  document.getElementById("reset").addEventListener("click", function () {
+    lift = 0;
+    liftVel = 0;
+    celebrate = 0;
+    hintEl.textContent = "Drag the orange rope handle down to lift the crate";
+  });
+
+  // ---- how-it-works panel ----
+  var howBtn = document.getElementById("howBtn");
+  var howPanel = document.getElementById("howPanel");
+  howBtn.addEventListener("click", function () {
+    howPanel.classList.toggle("show");
+  });
+
+  // ---- boot ----
+  window.addEventListener("resize", resize);
+  resize();
+  setPulleys(2);
+  requestAnimationFrame(function (t) {
+    lastT = t;
+    requestAnimationFrame(frame);
+  });
+  requestAnimationFrame(function () {
+    stage.classList.add("ready");
+  });
+})();
+</script>
+</body>
+</html>

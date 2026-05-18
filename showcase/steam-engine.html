@@ -1,0 +1,907 @@
+<!--ARCADELAB
+title: Steam Engine
+description: A see-through steam engine — turn up the fire to boil water, push the piston with steam, and spin the giant flywheel faster and faster.
+emoji: 🚂
+color: red
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Steam Engine</title>
+<style>
+  :root {
+    --bg: #160a0a;
+    --panel: rgba(46, 18, 18, 0.88);
+    --accent: #ff6b4d;
+    --accent2: #ffb33c;
+    --text: #ffeede;
+    --muted: #f0b9a8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    background: var(--panel);
+    border: 1px solid rgba(255, 107, 77, 0.34);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; pointer-events: auto; }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(255, 107, 77, 0.4);
+    border-radius: 13px;
+    padding: 11px 16px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(74, 28, 28, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #heatBox {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--panel);
+    border: 1px solid rgba(255, 107, 77, 0.34);
+    border-radius: 15px;
+    padding: 12px 18px;
+    width: min(460px, 92vw);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #heatBox .lbl {
+    font-size: clamp(13px, 3.6vw, 16px);
+    font-weight: 700;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+  #heat {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 16px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #3a2222 0%, #ff7a3c 60%, #ffd24d 100%);
+    outline: none;
+    margin: 0;
+  }
+  #heat::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #ff6b4d);
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    cursor: pointer;
+  }
+  #heat::-moz-range-thumb {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #ff6b4d);
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    cursor: pointer;
+  }
+  #heatVal {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--accent2);
+    min-width: 3ch;
+    text-align: right;
+  }
+  #howPanel {
+    position: fixed;
+    left: 50%;
+    bottom: clamp(108px, 24vw, 132px);
+    transform: translateX(-50%) translateY(12px);
+    width: min(420px, 90vw);
+    background: var(--panel);
+    border: 1px solid rgba(255, 107, 77, 0.44);
+    border-radius: 16px;
+    padding: 16px 18px;
+    z-index: 6;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease, transform .22s ease;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  #howPanel.open { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+  #howPanel h2 { margin: 0 0 8px; font-size: clamp(15px, 4vw, 18px); color: var(--accent); }
+  #howPanel p { margin: 6px 0; font-size: clamp(13px, 3.6vw, 15px); line-height: 1.5; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🚂</span><span>Steam Engine</span></div>
+  <div class="spacer"></div>
+  <div class="controls">
+    <button id="how" type="button">How it works</button>
+  </div>
+</div>
+
+<div id="howPanel">
+  <h2>How it works</h2>
+  <p>The fire heats water in the boiler until it turns into steam.</p>
+  <p>Steam takes up lots of room, so it pushes the piston along the cylinder.</p>
+  <p>The piston pushes a rod that turns the crank, spinning the heavy flywheel round and round.</p>
+  <p>More fire makes more steam — and a faster flywheel!</p>
+</div>
+
+<div id="info">
+  <div id="heatBox">
+    <span class="lbl">🔥 Heat</span>
+    <input id="heat" type="range" min="0" max="100" value="55" step="1" aria-label="Heat">
+    <span id="heatVal">55</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var heatSlider = document.getElementById("heat");
+  var heatVal = document.getElementById("heatVal");
+
+  var W = 0, H = 0, DPR = 1;
+
+  var heat = 55;          // 0..100
+  var crankAngle = 0;     // radians
+  var crankSpeed = 0;     // radians/sec
+
+  // particle pools
+  var steamParticles = [];
+  var fireParticles = [];
+  var emberParticles = [];
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ---- layout: all geometry computed from window size into one object ----
+  var L = {};
+  function layout() {
+    // Engine fits inside a centered region. We design in a virtual frame and
+    // place it. Reserve top space for HUD and bottom for the heat slider.
+    var topPad = 84;
+    var botPad = 150;
+    var availH = Math.max(120, H - topPad - botPad);
+    var availW = W * 0.94;
+
+    // The engine drawing has a natural aspect ratio ~ 1.55 wide : 1 tall
+    var aspect = 1.62;
+    var ew = Math.min(availW, availH * aspect);
+    var eh = ew / aspect;
+    if (eh > availH) { eh = availH; ew = eh * aspect; }
+
+    var ox = (W - ew) / 2;
+    var oy = topPad + (availH - eh) / 2;
+
+    L.ox = ox; L.oy = oy; L.ew = ew; L.eh = eh;
+
+    // --- boiler (left-center) ---
+    L.boiler = {
+      x: ox + ew * 0.05,
+      y: oy + eh * 0.12,
+      w: ew * 0.42,
+      h: eh * 0.62
+    };
+    // fire box under boiler
+    L.fire = {
+      x: L.boiler.x + L.boiler.w * 0.12,
+      y: L.boiler.y + L.boiler.h,
+      w: L.boiler.w * 0.76,
+      h: eh * 0.22
+    };
+    // water level inside boiler (lower half)
+    L.waterTop = L.boiler.y + L.boiler.h * 0.46;
+
+    // --- steam pipe from boiler top to cylinder ---
+    // --- cylinder (right side, horizontal) ---
+    var cylH = eh * 0.26;
+    L.cylinder = {
+      x: L.boiler.x + L.boiler.w + ew * 0.04,
+      y: oy + eh * 0.16,
+      w: ew * 0.40,
+      h: cylH
+    };
+    // piston travels inside cylinder
+    L.pistonW = L.cylinder.w * 0.16;
+    L.strokeMin = L.cylinder.x + L.pistonW * 0.5 + 4;          // leftmost piston center
+    L.strokeMax = L.cylinder.x + L.cylinder.w - L.pistonW - 8; // rightmost piston center
+    L.pistonY = L.cylinder.y + L.cylinder.h / 2;
+
+    // --- flywheel (far right) ---
+    var flyR = Math.min(eh * 0.34, ew * 0.17);
+    L.fly = {
+      cx: L.cylinder.x + L.cylinder.w + ew * 0.02 + flyR,
+      cy: L.pistonY,
+      r: flyR
+    };
+    // crank pin radius = half the piston stroke
+    L.crankR = (L.strokeMax - L.strokeMin) / 2;
+    if (L.crankR > flyR * 0.62) L.crankR = flyR * 0.62;
+    // make sure flywheel fits on screen
+    if (L.fly.cx + flyR > W - 8) {
+      var over = (L.fly.cx + flyR) - (W - 8);
+      L.fly.cx -= over;
+    }
+  }
+
+  // ---- piston kinematics ----
+  // Crank pin at angle a:  pinX = fly.cx + crankR*cos(a)
+  // Piston center X follows a slider-crank. Rod length chosen long for smoothness.
+  function pistonXForAngle(a) {
+    var rodLen = L.fly.r * 1.9;
+    var pinX = L.fly.cx + L.crankR * Math.cos(a);
+    var pinY = L.fly.cy + L.crankR * Math.sin(a);
+    // piston moves along horizontal line y = pistonY
+    var dy = L.pistonY - pinY;
+    var horiz = Math.sqrt(Math.max(0, rodLen * rodLen - dy * dy));
+    return pinX - horiz;
+  }
+
+  // ---- resize ----
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    layout();
+  }
+
+  // ---- particle spawning ----
+  function spawnFire() {
+    if (heat <= 0) return;
+    var n = Math.round(heat / 22);
+    for (var i = 0; i < n; i++) {
+      var fx = L.fire.x + rand(0.1, 0.9) * L.fire.w;
+      fireParticles.push({
+        x: fx,
+        y: L.fire.y + L.fire.h - rand(0, 6),
+        vx: rand(-8, 8),
+        vy: rand(-46, -82) * (0.5 + heat / 200),
+        life: 1,
+        decay: rand(1.4, 2.4),
+        size: rand(6, 14) * (0.6 + heat / 200)
+      });
+    }
+    if (Math.random() < heat / 240) {
+      emberParticles.push({
+        x: L.fire.x + rand(0.15, 0.85) * L.fire.w,
+        y: L.fire.y + L.fire.h - 4,
+        vx: rand(-14, 14),
+        vy: rand(-60, -110),
+        life: 1,
+        decay: rand(0.5, 1.0),
+        size: rand(1.4, 2.8)
+      });
+    }
+  }
+
+  function spawnSteam() {
+    if (heat <= 4) return;
+    // steam rises from water surface inside the boiler
+    if (Math.random() < 0.25 + heat / 130) {
+      steamParticles.push({
+        x: L.boiler.x + rand(0.2, 0.8) * L.boiler.w,
+        y: L.waterTop - rand(0, 8),
+        vx: rand(-6, 6),
+        vy: rand(-14, -30) * (0.4 + heat / 160),
+        life: 1,
+        decay: rand(0.35, 0.7),
+        size: rand(8, 18),
+        inBoiler: true
+      });
+    }
+    // steam puffs out of the cylinder exhaust when the piston pushes
+    var pf = (Math.cos(crankAngle) + 1) / 2; // 0..1
+    if (heat > 8 && pf > 0.7 && Math.random() < 0.4) {
+      steamParticles.push({
+        x: L.cylinder.x + L.cylinder.w * 0.5,
+        y: L.cylinder.y - 4,
+        vx: rand(-10, 10),
+        vy: rand(-20, -42),
+        life: 1,
+        decay: rand(0.6, 1.1),
+        size: rand(6, 12),
+        inBoiler: false
+      });
+    }
+  }
+
+  function updateParticles(dt) {
+    var i, p;
+    for (i = fireParticles.length - 1; i >= 0; i--) {
+      p = fireParticles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy -= 30 * dt;            // buoyancy
+      p.life -= p.decay * dt;
+      if (p.life <= 0) fireParticles.splice(i, 1);
+    }
+    for (i = emberParticles.length - 1; i >= 0; i--) {
+      p = emberParticles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 40 * dt;
+      p.life -= p.decay * dt;
+      if (p.life <= 0) emberParticles.splice(i, 1);
+    }
+    for (i = steamParticles.length - 1; i >= 0; i--) {
+      p = steamParticles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy -= 8 * dt;
+      p.size += 10 * dt;
+      p.life -= p.decay * dt;
+      // keep boiler steam loosely inside the boiler walls
+      if (p.inBoiler) {
+        if (p.x < L.boiler.x + 6) p.x = L.boiler.x + 6;
+        if (p.x > L.boiler.x + L.boiler.w - 6) p.x = L.boiler.x + L.boiler.w - 6;
+        if (p.y < L.boiler.y + 6) p.life -= dt * 1.5;
+      }
+      if (p.life <= 0) steamParticles.splice(i, 1);
+    }
+    // cap pools
+    if (fireParticles.length > 240) fireParticles.splice(0, fireParticles.length - 240);
+    if (steamParticles.length > 200) steamParticles.splice(0, steamParticles.length - 200);
+    if (emberParticles.length > 80) emberParticles.splice(0, emberParticles.length - 80);
+  }
+
+  // ---- drawing helpers ----
+  function roundRect(x, y, w, h, r) {
+    var rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+  }
+
+  function label(text, x, y) {
+    ctx.font = "700 " + Math.max(11, Math.min(16, L.eh * 0.05)) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    var w = ctx.measureText(text).width;
+    var padX = 7, padY = 4;
+    ctx.fillStyle = "rgba(20,8,8,0.78)";
+    roundRect(x - w / 2 - padX, y - 9 - padY, w + padX * 2, 18 + padY * 2, 7);
+    ctx.fill();
+    ctx.fillStyle = "#ffeede";
+    ctx.fillText(text, x, y);
+  }
+
+  // ---- render ----
+  function draw(time) {
+    // background
+    var bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#241010");
+    bg.addColorStop(1, "#120707");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    var b = L.boiler, fire = L.fire, cyl = L.cylinder, fly = L.fly;
+    var flicker = 0.7 + 0.3 * Math.sin(time * 0.02) * (heat / 100);
+
+    // ground / base plate
+    ctx.fillStyle = "#3a2018";
+    var baseY = Math.max(b.y + b.h, fly.cy + fly.r) + 6;
+    roundRect(L.ox - 6, baseY, L.ew + 12, 16, 8);
+    ctx.fill();
+
+    // ----- FIRE BOX -----
+    // fire glow on the ground
+    if (heat > 0) {
+      var glow = ctx.createRadialGradient(
+        fire.x + fire.w / 2, fire.y + fire.h, 4,
+        fire.x + fire.w / 2, fire.y + fire.h, fire.w * (0.8 + heat / 90));
+      glow.addColorStop(0, "rgba(255,150,40," + (0.5 * heat / 100) + ")");
+      glow.addColorStop(1, "rgba(255,150,40,0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(fire.x - fire.w, fire.y - fire.h, fire.w * 3, fire.h * 2.4);
+    }
+    // fire box frame
+    ctx.fillStyle = "#1c0e08";
+    roundRect(fire.x - 5, fire.y, fire.w + 10, fire.h + 4, 6);
+    ctx.fill();
+    // coals
+    ctx.fillStyle = heat > 0 ? "rgba(120,40,20,1)" : "rgba(60,40,36,1)";
+    for (var cI = 0; cI < 6; cI++) {
+      var coalX = fire.x + (cI + 0.5) / 6 * fire.w;
+      ctx.beginPath();
+      ctx.arc(coalX, fire.y + fire.h - 3, fire.w * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (heat > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (var ci2 = 0; ci2 < 6; ci2++) {
+        var cx2 = fire.x + (ci2 + 0.5) / 6 * fire.w;
+        ctx.fillStyle = "rgba(255,120,30," + (0.5 * heat / 100 * flicker) + ")";
+        ctx.beginPath();
+        ctx.arc(cx2, fire.y + fire.h - 3, fire.w * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // fire particles
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (var fI = 0; fI < fireParticles.length; fI++) {
+      var fp = fireParticles[fI];
+      var lf = Math.max(0, fp.life);
+      // color shifts yellow->orange->red as it cools
+      var r = 255;
+      var g = Math.round(60 + 170 * lf);
+      var bl = Math.round(30 * lf);
+      var fg = ctx.createRadialGradient(fp.x, fp.y, 0, fp.x, fp.y, fp.size * (0.5 + lf));
+      fg.addColorStop(0, "rgba(" + r + "," + g + "," + bl + "," + (0.55 * lf) + ")");
+      fg.addColorStop(1, "rgba(" + r + "," + g + "," + bl + ",0)");
+      ctx.fillStyle = fg;
+      ctx.beginPath();
+      ctx.arc(fp.x, fp.y, fp.size * (0.6 + lf), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // embers
+    for (var eI = 0; eI < emberParticles.length; eI++) {
+      var ep = emberParticles[eI];
+      ctx.fillStyle = "rgba(255,210,90," + Math.max(0, ep.life) + ")";
+      ctx.beginPath();
+      ctx.arc(ep.x, ep.y, ep.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // ----- BOILER -----
+    // metal shell
+    var shell = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.h);
+    shell.addColorStop(0, "#8a4a3a");
+    shell.addColorStop(0.5, "#5e2e26");
+    shell.addColorStop(1, "#3a1c18");
+    ctx.fillStyle = shell;
+    roundRect(b.x, b.y, b.w, b.h, 18);
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#2a1410";
+    ctx.stroke();
+
+    // boiler rivets
+    ctx.fillStyle = "rgba(255,200,160,0.35)";
+    for (var rv = 0; rv < 5; rv++) {
+      var ry = b.y + 12 + rv / 4 * (b.h - 24);
+      ctx.beginPath(); ctx.arc(b.x + 9, ry, 2.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(b.x + b.w - 9, ry, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // window into the boiler (cutaway) showing water + steam
+    var winPad = 14;
+    var winX = b.x + winPad, winY = b.y + winPad;
+    var winW = b.w - winPad * 2, winH = b.h - winPad * 2;
+    ctx.save();
+    roundRect(winX, winY, winW, winH, 10);
+    ctx.clip();
+    // steam space (above water)
+    var steamBg = ctx.createLinearGradient(0, winY, 0, L.waterTop);
+    steamBg.addColorStop(0, "#3d2a2a");
+    steamBg.addColorStop(1, "#52383a");
+    ctx.fillStyle = steamBg;
+    ctx.fillRect(winX, winY, winW, L.waterTop - winY);
+    // water
+    var waterBottom = winY + winH;
+    var waterGrad = ctx.createLinearGradient(0, L.waterTop, 0, waterBottom);
+    waterGrad.addColorStop(0, "#3aa6c8");
+    waterGrad.addColorStop(1, "#1d5e80");
+    ctx.fillStyle = waterGrad;
+    // wavy water surface
+    ctx.beginPath();
+    ctx.moveTo(winX, L.waterTop);
+    var waveAmp = 2 + heat / 22;
+    for (var wx = 0; wx <= winW; wx += 6) {
+      var wy = L.waterTop + Math.sin((wx / winW) * 6.5 + time * 0.006 * (1 + heat / 60)) * waveAmp;
+      ctx.lineTo(winX + wx, wy);
+    }
+    ctx.lineTo(winX + winW, waterBottom);
+    ctx.lineTo(winX, waterBottom);
+    ctx.closePath();
+    ctx.fill();
+    // rising bubbles in water
+    if (heat > 6) {
+      ctx.fillStyle = "rgba(220,245,255,0.55)";
+      var bubbleCount = Math.round(heat / 12);
+      for (var bb = 0; bb < bubbleCount; bb++) {
+        var seed = bb * 97.13;
+        var bxF = (Math.sin(seed) * 0.5 + 0.5);
+        var bx = winX + 8 + bxF * (winW - 16);
+        var phase = (time * 0.001 * (0.6 + heat / 120) + bb * 0.37) % 1;
+        var by = waterBottom - phase * (waterBottom - L.waterTop);
+        var br = 1.4 + (1 - phase) * 2.4;
+        ctx.globalAlpha = 0.4 + 0.4 * phase;
+        ctx.beginPath();
+        ctx.arc(bx, by, br, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // steam clouds inside boiler
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (var sI = 0; sI < steamParticles.length; sI++) {
+      var sp = steamParticles[sI];
+      if (!sp.inBoiler) continue;
+      var sa = Math.max(0, sp.life) * 0.4;
+      var sg = ctx.createRadialGradient(sp.x, sp.y, 0, sp.x, sp.y, sp.size);
+      sg.addColorStop(0, "rgba(255,255,255," + sa + ")");
+      sg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = sg;
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, sp.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.restore(); // unclip window
+
+    // window frame
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#2a1410";
+    roundRect(winX, winY, winW, winH, 10);
+    ctx.stroke();
+
+    // ----- STEAM PIPE from boiler top to cylinder -----
+    var pipeY = b.y + b.h * 0.12;
+    var pipeStartX = b.x + b.w - 4;
+    var pipeEndX = cyl.x + 6;
+    ctx.lineWidth = Math.max(8, L.eh * 0.06);
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#6b3a2e";
+    ctx.beginPath();
+    ctx.moveTo(b.x + b.w * 0.78, b.y + 4);
+    ctx.lineTo(b.x + b.w * 0.78, pipeY);
+    ctx.lineTo(pipeEndX, pipeY);
+    ctx.lineTo(pipeEndX, cyl.y + cyl.h * 0.3);
+    ctx.stroke();
+    ctx.lineWidth = Math.max(4, L.eh * 0.03);
+    ctx.strokeStyle = "#9a5a48";
+    ctx.stroke();
+
+    // moving steam glow inside the pipe when hot
+    if (heat > 8) {
+      var pulse = (Math.sin(time * 0.006) + 1) / 2;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "rgba(255,255,255," + (0.18 + 0.22 * pulse) * (heat / 100) + ")";
+      ctx.lineWidth = Math.max(2, L.eh * 0.018);
+      ctx.beginPath();
+      ctx.moveTo(b.x + b.w * 0.78, b.y + 4);
+      ctx.lineTo(b.x + b.w * 0.78, pipeY);
+      ctx.lineTo(pipeEndX, pipeY);
+      ctx.lineTo(pipeEndX, cyl.y + cyl.h * 0.3);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // ----- CYLINDER + PISTON -----
+    var pistonX = pistonXForAngle(crankAngle);
+
+    // cylinder body
+    var cylGrad = ctx.createLinearGradient(0, cyl.y, 0, cyl.y + cyl.h);
+    cylGrad.addColorStop(0, "#7a6a72");
+    cylGrad.addColorStop(0.5, "#4a3a44");
+    cylGrad.addColorStop(1, "#2c2028");
+    ctx.fillStyle = cylGrad;
+    roundRect(cyl.x, cyl.y, cyl.w, cyl.h, 12);
+    ctx.fill();
+
+    // inside of cylinder (cutaway) — clip
+    ctx.save();
+    var inPad = 6;
+    roundRect(cyl.x + inPad, cyl.y + inPad, cyl.w - inPad * 2, cyl.h - inPad * 2, 8);
+    ctx.clip();
+    // dark bore
+    ctx.fillStyle = "#1a1218";
+    ctx.fillRect(cyl.x, cyl.y, cyl.w, cyl.h);
+    // steam pressure behind piston (left side) — brighter with heat
+    var steamFill = ctx.createLinearGradient(cyl.x, 0, pistonX, 0);
+    var sIntensity = (heat / 100) * (0.35 + 0.4 * ((Math.cos(crankAngle) + 1) / 2));
+    steamFill.addColorStop(0, "rgba(255,255,255," + (0.15 + sIntensity) + ")");
+    steamFill.addColorStop(1, "rgba(255,255,255,0.04)");
+    ctx.fillStyle = steamFill;
+    ctx.fillRect(cyl.x + inPad, cyl.y + inPad, pistonX - L.pistonW / 2 - (cyl.x + inPad), cyl.h - inPad * 2);
+    // little steam swirls behind piston
+    if (heat > 8) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (var sw = 0; sw < 5; sw++) {
+        var swPhase = (time * 0.002 + sw * 0.4) % 1;
+        var swX = cyl.x + inPad + swPhase * (pistonX - L.pistonW / 2 - cyl.x - inPad);
+        var swY = L.pistonY + Math.sin(time * 0.004 + sw) * cyl.h * 0.22;
+        ctx.fillStyle = "rgba(255,255,255," + (0.12 * heat / 100) + ")";
+        ctx.beginPath();
+        ctx.arc(swX, swY, cyl.h * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    // piston head
+    var pistonGrad = ctx.createLinearGradient(0, cyl.y, 0, cyl.y + cyl.h);
+    pistonGrad.addColorStop(0, "#ffd24d");
+    pistonGrad.addColorStop(0.5, "#e8902c");
+    pistonGrad.addColorStop(1, "#b3601c");
+    ctx.fillStyle = pistonGrad;
+    roundRect(pistonX - L.pistonW / 2, cyl.y + inPad + 1, L.pistonW, cyl.h - inPad * 2 - 2, 4);
+    ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(pistonX - L.pistonW * 0.18, cyl.y + inPad + 1, L.pistonW * 0.12, cyl.h - inPad * 2 - 2);
+    ctx.restore(); // unclip cylinder
+
+    // cylinder frame
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#1c141a";
+    roundRect(cyl.x, cyl.y, cyl.w, cyl.h, 12);
+    ctx.stroke();
+
+    // ----- CONNECTING ROD + CRANK -----
+    var pinX = fly.cx + L.crankR * Math.cos(crankAngle);
+    var pinY = fly.cy + L.crankR * Math.sin(crankAngle);
+    // piston rod end (right side of piston head)
+    var rodStartX = pistonX + L.pistonW / 2;
+    var rodStartY = L.pistonY;
+
+    // piston rod (the straight part poking out of cylinder)
+    ctx.lineWidth = Math.max(5, L.eh * 0.035);
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "#c9c0c4";
+    ctx.beginPath();
+    ctx.moveTo(rodStartX, rodStartY);
+    ctx.lineTo(Math.min(pinX, cyl.x + cyl.w + L.crankR * 0.3), rodStartY);
+    ctx.stroke();
+
+    // connecting rod to crank pin
+    ctx.lineWidth = Math.max(6, L.eh * 0.045);
+    var rodGrad = ctx.createLinearGradient(rodStartX, rodStartY, pinX, pinY);
+    rodGrad.addColorStop(0, "#d8cfd3");
+    rodGrad.addColorStop(1, "#8a8086");
+    ctx.strokeStyle = rodGrad;
+    ctx.beginPath();
+    ctx.moveTo(rodStartX, rodStartY);
+    ctx.lineTo(pinX, pinY);
+    ctx.stroke();
+    // rod end bearings
+    ctx.fillStyle = "#3a3036";
+    ctx.beginPath(); ctx.arc(rodStartX, rodStartY, L.eh * 0.028, 0, Math.PI * 2); ctx.fill();
+
+    // ----- FLYWHEEL -----
+    // shadow
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.beginPath();
+    ctx.arc(fly.cx + 4, fly.cy + 6, fly.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // outer rim
+    var rimGrad = ctx.createRadialGradient(
+      fly.cx - fly.r * 0.3, fly.cy - fly.r * 0.3, fly.r * 0.2,
+      fly.cx, fly.cy, fly.r);
+    rimGrad.addColorStop(0, "#ff8a5c");
+    rimGrad.addColorStop(0.7, "#d4452a");
+    rimGrad.addColorStop(1, "#7c2418");
+    ctx.fillStyle = rimGrad;
+    ctx.beginPath();
+    ctx.arc(fly.cx, fly.cy, fly.r, 0, Math.PI * 2);
+    ctx.fill();
+    // inner cut
+    ctx.fillStyle = "#241010";
+    ctx.beginPath();
+    ctx.arc(fly.cx, fly.cy, fly.r * 0.74, 0, Math.PI * 2);
+    ctx.fill();
+
+    // spokes (rotate with crank)
+    ctx.save();
+    ctx.translate(fly.cx, fly.cy);
+    ctx.rotate(crankAngle);
+    var spokes = 6;
+    for (var sp2 = 0; sp2 < spokes; sp2++) {
+      ctx.save();
+      ctx.rotate((Math.PI * 2 / spokes) * sp2);
+      var spkGrad = ctx.createLinearGradient(0, -fly.r * 0.1, 0, -fly.r * 0.78);
+      spkGrad.addColorStop(0, "#9a3422");
+      spkGrad.addColorStop(1, "#e06038");
+      ctx.fillStyle = spkGrad;
+      ctx.beginPath();
+      ctx.moveTo(-fly.r * 0.06, -fly.r * 0.16);
+      ctx.lineTo(fly.r * 0.06, -fly.r * 0.16);
+      ctx.lineTo(fly.r * 0.04, -fly.r * 0.78);
+      ctx.lineTo(-fly.r * 0.04, -fly.r * 0.78);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    // hub
+    ctx.fillStyle = "#ffb33c";
+    ctx.beginPath();
+    ctx.arc(0, 0, fly.r * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#5e2e1a";
+    ctx.beginPath();
+    ctx.arc(0, 0, fly.r * 0.07, 0, Math.PI * 2);
+    ctx.fill();
+    // bright marker spoke so spin is obvious
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(0, -fly.r * 0.84, Math.max(4, fly.r * 0.08), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffd24d";
+    ctx.beginPath();
+    ctx.arc(0, -fly.r * 0.84, Math.max(2.4, fly.r * 0.05), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // rim highlight ring
+    ctx.lineWidth = Math.max(2, fly.r * 0.04);
+    ctx.strokeStyle = "rgba(255,210,170,0.4)";
+    ctx.beginPath();
+    ctx.arc(fly.cx, fly.cy, fly.r * 0.88, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // crank pin on top of everything
+    ctx.fillStyle = "#3a3036";
+    ctx.beginPath();
+    ctx.arc(pinX, pinY, L.eh * 0.03, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#c9c0c4";
+    ctx.beginPath();
+    ctx.arc(pinX, pinY, L.eh * 0.016, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ----- exhaust steam puffs (outside boiler) -----
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (var sJ = 0; sJ < steamParticles.length; sJ++) {
+      var sp2p = steamParticles[sJ];
+      if (sp2p.inBoiler) continue;
+      var sa2 = Math.max(0, sp2p.life) * 0.5;
+      var sg2 = ctx.createRadialGradient(sp2p.x, sp2p.y, 0, sp2p.x, sp2p.y, sp2p.size);
+      sg2.addColorStop(0, "rgba(255,255,255," + sa2 + ")");
+      sg2.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = sg2;
+      ctx.beginPath();
+      ctx.arc(sp2p.x, sp2p.y, sp2p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // ----- LABELS -----
+    label("Fire", fire.x + fire.w / 2, fire.y + fire.h + 16);
+    label("Boiler", b.x + b.w / 2, b.y - 12);
+    label("Steam", b.x + b.w * 0.5, L.waterTop - b.h * 0.22);
+    label("Water", b.x + b.w * 0.5, L.waterTop + b.h * 0.2);
+    label("Piston", pistonX, cyl.y - 12);
+    label("Rod", (rodStartX + pinX) / 2, (rodStartY + pinY) / 2 - 14);
+    label("Flywheel", fly.cx, fly.cy + fly.r + 16);
+  }
+
+  // ---- main loop ----
+  var lastT = 0;
+  function frame(t) {
+    var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+    lastT = t;
+
+    // heat sets a target flywheel speed; speed eases toward it (inertia)
+    var targetSpeed = (heat / 100) * 7.2;        // rad/sec at full heat
+    crankSpeed += (targetSpeed - crankSpeed) * Math.min(1, dt * 1.4);
+    if (heat <= 0 && Math.abs(crankSpeed) < 0.03) crankSpeed = 0;
+    crankAngle += crankSpeed * dt;
+    if (crankAngle > Math.PI * 2) crankAngle -= Math.PI * 2;
+
+    spawnFire();
+    spawnSteam();
+    updateParticles(dt);
+    draw(t);
+
+    requestAnimationFrame(frame);
+  }
+
+  // ---- input ----
+  function onHeat() {
+    heat = parseInt(heatSlider.value, 10) || 0;
+    heatVal.textContent = heat;
+  }
+  heatSlider.addEventListener("input", onHeat);
+  heatSlider.addEventListener("change", onHeat);
+
+  var howBtn = document.getElementById("how");
+  var howPanel = document.getElementById("howPanel");
+  howBtn.addEventListener("click", function () {
+    howPanel.classList.toggle("open");
+  });
+  document.addEventListener("pointerdown", function (e) {
+    if (howPanel.classList.contains("open") &&
+        !howPanel.contains(e.target) && e.target !== howBtn) {
+      howPanel.classList.remove("open");
+    }
+  });
+
+  window.addEventListener("resize", resize);
+
+  // ---- boot ----
+  resize();
+  onHeat();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(function () { stage.classList.add("ready"); });
+})();
+</script>
+</body>
+</html>

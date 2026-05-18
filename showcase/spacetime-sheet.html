@@ -1,0 +1,775 @@
+<!--ARCADELAB
+title: Spacetime Sheet
+description: A mesmerizing gravity sandbox — a heavy mass dents a rubber-sheet grid, and flicked marbles roll down the curve, orbiting and spiraling just like planets around a star.
+emoji: 🌌
+color: purple
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Spacetime Sheet</title>
+<style>
+  :root {
+    --bg: #07041a;
+    --panel: rgba(26, 16, 54, 0.86);
+    --accent: #b98cff;
+    --accent2: #e0b3ff;
+    --text: #f1e9ff;
+    --muted: #bfaee6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--text);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #stage { position: fixed; inset: 0; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+  }
+  #hud {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: clamp(17px, 4.6vw, 22px);
+    letter-spacing: 0.2px;
+    background: var(--panel);
+    border: 1px solid rgba(185, 140, 255, 0.30);
+    border-radius: 14px;
+    padding: 8px 13px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .title .em { font-size: 1.15em; }
+  .spacer { flex: 1 1 auto; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: auto;
+  }
+  button {
+    pointer-events: auto;
+    font: inherit;
+    font-size: clamp(14px, 3.6vw, 16px);
+    font-weight: 700;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid rgba(185, 140, 255, 0.34);
+    border-radius: 13px;
+    padding: 11px 15px;
+    min-height: 44px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: transform .12s ease, background .18s ease, border-color .18s ease;
+  }
+  button:hover { background: rgba(48, 30, 88, 0.95); border-color: var(--accent); }
+  button:active { transform: scale(0.94); }
+  .massbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid rgba(185, 140, 255, 0.30);
+    border-radius: 15px;
+    padding: 8px 14px;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .massbox label {
+    font-size: clamp(13px, 3.4vw, 15px);
+    font-weight: 700;
+    color: var(--accent2);
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: clamp(96px, 26vw, 180px);
+    height: 30px;
+    background: transparent;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 10px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #6a4aa8, #b98cff);
+  }
+  input[type=range]::-moz-range-track {
+    height: 10px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #6a4aa8, #b98cff);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px; height: 28px;
+    margin-top: -9px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #c79bff);
+    border: 2px solid #e0b3ff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #c79bff);
+    border: 2px solid #e0b3ff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  #info {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: clamp(10px, 2.4vw, 18px);
+    pointer-events: none;
+    z-index: 5;
+  }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(185, 140, 255, 0.22);
+    border-radius: 13px;
+    padding: 8px 14px;
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #howBtn { pointer-events: auto; }
+  #howPanel {
+    pointer-events: auto;
+    display: none;
+    background: var(--panel);
+    border: 1px solid rgba(185, 140, 255, 0.30);
+    border-radius: 14px;
+    padding: 14px 16px;
+    max-width: min(440px, 92vw);
+    font-size: clamp(13px, 3.5vw, 15px);
+    line-height: 1.5;
+    color: var(--text);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #howPanel.show { display: block; }
+  #howPanel h3 { margin: 0 0 6px; font-size: 1.05em; color: var(--accent2); }
+  #howPanel p { margin: 6px 0; }
+  #stage { opacity: 0; transition: opacity .8s ease; }
+  #stage.ready { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c"></canvas>
+</div>
+
+<div id="hud">
+  <div class="title"><span class="em">🌌</span><span>Spacetime Sheet</span></div>
+  <div class="spacer"></div>
+  <div class="massbox">
+    <label for="mass">Mass</label>
+    <input id="mass" type="range" min="0" max="100" value="55">
+  </div>
+  <div class="controls">
+    <button id="clear" type="button">Clear</button>
+  </div>
+</div>
+
+<div id="info">
+  <div id="howPanel">
+    <h3>How it works</h3>
+    <p>Heavy things bend space around them, like a bowling ball on a stretchy sheet.</p>
+    <p>Marbles you flick aren't pushed by a force — they just roll straight, but the bent sheet curves their path.</p>
+    <p>That curve is gravity! Some marbles fall in, some swing into orbits, just like planets around the Sun.</p>
+  </div>
+  <div id="hint">Flick anywhere to send a marble across the warped grid</div>
+  <button id="howBtn" type="button">How it works</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var stage = document.getElementById("stage");
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  var massSlider = document.getElementById("mass");
+  var hintEl = document.getElementById("hint");
+
+  var W = 0, H = 0, DPR = 1;
+
+  // ---- simulation tuning ----
+  var GRID_N = 22;            // grid cells per side (square grid)
+  var DT = 1 / 60;
+  var SUBSTEPS = 3;
+
+  var marbles = [];
+  var stars = [];            // background twinkles
+  var paletteIdx = 0;
+  var palette = [
+    [196, 90, 72], [320, 88, 76], [44, 95, 70],
+    [150, 72, 66], [262, 88, 78], [12, 92, 72]
+  ];
+
+  // mass: 0..1 fraction from slider
+  var massFrac = 0.55;
+
+  // central mass position (world coords, on the sheet plane)
+  var mass = { x: 0, y: 0 };
+
+  // perspective projection params (recomputed on resize)
+  var proj = {
+    cx: 0, cy: 0,        // screen center of sheet
+    halfW: 0,            // half-width of sheet in world units
+    tilt: 0.52,          // vertical squash for perspective
+    scale: 1,            // world->screen scale
+    depthScale: 0.6      // far edge shrink factor
+  };
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  // ---- layout / resize ----
+  function resize() {
+    var rect = stage.getBoundingClientRect();
+    W = Math.max(1, rect.width);
+    H = Math.max(1, rect.height);
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    // sheet spans most of the window
+    proj.cx = W / 2;
+    proj.cy = H * 0.52;
+    proj.halfW = 1.0;                     // world units: sheet from -1..1
+    proj.scale = Math.min(W * 0.46, H * 0.62);
+    proj.tilt = clamp(H / W, 0.34, 0.62); // taller screens => more tilt
+    mass.x = 0;
+    mass.y = 0;
+
+    makeStars();
+  }
+
+  function makeStars() {
+    stars = [];
+    var n = Math.round((W * H) / 12000);
+    n = Math.max(40, Math.min(220, n));
+    for (var i = 0; i < n; i++) {
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: rand(0.3, 1.4),
+        a: rand(0.12, 0.7),
+        tw: rand(0, Math.PI * 2),
+        sp: rand(0.4, 1.6)
+      });
+    }
+  }
+
+  // ---- the well: depth of the sheet at world point (x,y) ----
+  // depth is positive going "down". Visualized by lowering screen-y.
+  function wellDepth(x, y) {
+    var dx = x - mass.x;
+    var dy = y - mass.y;
+    var r = Math.sqrt(dx * dx + dy * dy);
+    // smooth funnel: deeper near center, scaled by mass
+    var strength = 0.06 + massFrac * 0.95;
+    var core = 0.16;                       // core softening radius
+    // depth ~ strength / (r + core), capped
+    var d = strength * core / (r + core);
+    return d;
+  }
+
+  // gradient of depth (downhill direction) for marble physics.
+  // returns acceleration vector pointing toward the dip.
+  function gravityAccel(x, y) {
+    var dx = mass.x - x;
+    var dy = mass.y - y;
+    var r2 = dx * dx + dy * dy;
+    var soft = 0.026;                      // softening so it never blows up
+    var r = Math.sqrt(r2 + soft);
+    var strength = 0.10 + massFrac * 2.6;
+    // inverse-square-ish pull, gentle
+    var f = strength / (r2 + soft) ;
+    // cap acceleration magnitude
+    var maxF = 60;
+    if (f > maxF) f = maxF;
+    return { ax: dx / r * f, ay: dy / r * f };
+  }
+
+  // ---- project a world point on the (warped) sheet to screen coords ----
+  // world x,y in roughly -1.4..1.4. Perspective: far (negative y) is up & narrower.
+  function project(x, y) {
+    // perspective depth factor: y from -1 (far) to +1 (near)
+    var t = (y + proj.halfW) / (2 * proj.halfW);   // 0 far .. 1 near
+    t = clamp(t, -0.4, 1.4);
+    var persp = proj.depthScale + (1 - proj.depthScale) * t;
+    var sx = proj.cx + x * proj.scale * persp;
+    // base screen y: far rows up, near rows down
+    var sy = proj.cy + (y * proj.scale * proj.tilt);
+    // apply the well: dip lowers the point on screen
+    var d = wellDepth(x, y);
+    sy += d * proj.scale * 1.05;
+    return { x: sx, y: sy, persp: persp, depth: d };
+  }
+
+  // ---- marbles ----
+  function makeMarble(x, y, vx, vy) {
+    var p = palette[paletteIdx % palette.length];
+    paletteIdx++;
+    return {
+      x: x, y: y, vx: vx, vy: vy,
+      hue: p[0], sat: p[1], lit: p[2],
+      r: rand(0.030, 0.046),
+      trail: [],
+      alive: true,
+      age: 0
+    };
+  }
+
+  function step(dt) {
+    for (var i = marbles.length - 1; i >= 0; i--) {
+      var m = marbles[i];
+      // velocity-Verlet
+      var a0 = gravityAccel(m.x, m.y);
+      m.vx += a0.ax * dt * 0.5;
+      m.vy += a0.ay * dt * 0.5;
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      var a1 = gravityAccel(m.x, m.y);
+      m.vx += a1.ax * dt * 0.5;
+      m.vy += a1.ay * dt * 0.5;
+      m.age += dt;
+
+      // swallowed by the central mass
+      var dx = m.x - mass.x, dy = m.y - mass.y;
+      var rr = dx * dx + dy * dy;
+      var swallowR = 0.05 + massFrac * 0.05;
+      if (rr < swallowR * swallowR) {
+        m.alive = false;
+      }
+      // wandered far off the sheet
+      if (m.x < -2.0 || m.x > 2.0 || m.y < -2.0 || m.y > 2.0) {
+        m.alive = false;
+      }
+      if (!m.alive) {
+        marbles.splice(i, 1);
+      }
+    }
+  }
+
+  function recordTrails() {
+    for (var i = 0; i < marbles.length; i++) {
+      var m = marbles[i];
+      m.trail.push(m.x, m.y);
+      if (m.trail.length > 90) {
+        m.trail.splice(0, m.trail.length - 90);
+      }
+    }
+  }
+
+  // ---- rendering ----
+  function drawBackground(time) {
+    ctx.fillStyle = "#07041a";
+    ctx.fillRect(0, 0, W, H);
+    var g = ctx.createRadialGradient(W * 0.5, H * 0.4, 0, W * 0.5, H * 0.4, Math.max(W, H) * 0.9);
+    g.addColorStop(0, "#1a1040");
+    g.addColorStop(1, "#05030f");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var tw = 0.55 + 0.45 * Math.sin(time * 0.001 * s.sp + s.tw);
+      ctx.globalAlpha = s.a * tw;
+      ctx.fillStyle = "#e8ddff";
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGrid(time) {
+    var n = GRID_N;
+    var lo = -proj.halfW * 1.18;
+    var hi = proj.halfW * 1.18;
+    var stepW = (hi - lo) / n;
+    var i, j;
+
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    // lines running along x (constant y)
+    for (j = 0; j <= n; j++) {
+      var wy = lo + j * stepW;
+      ctx.beginPath();
+      var first = true;
+      for (i = 0; i <= n; i++) {
+        var wx = lo + i * stepW;
+        var p = project(wx, wy);
+        if (first) { ctx.moveTo(p.x, p.y); first = false; }
+        else ctx.lineTo(p.x, p.y);
+      }
+      // depth-based color: deeper rows glow warmer/brighter
+      var midDepth = wellDepth(0, wy);
+      var glow = clamp(midDepth * 1.4, 0, 1);
+      var alpha = 0.18 + glow * 0.55;
+      ctx.strokeStyle = "rgba(" + Math.round(150 + glow * 105) + ","
+        + Math.round(120 + glow * 60) + ",255," + alpha + ")";
+      ctx.lineWidth = 1 + glow * 1.6;
+      ctx.stroke();
+    }
+    // lines running along y (constant x)
+    for (i = 0; i <= n; i++) {
+      var wx2 = lo + i * stepW;
+      ctx.beginPath();
+      var first2 = true;
+      for (j = 0; j <= n; j++) {
+        var wy2 = lo + j * stepW;
+        var p2 = project(wx2, wy2);
+        if (first2) { ctx.moveTo(p2.x, p2.y); first2 = false; }
+        else ctx.lineTo(p2.x, p2.y);
+      }
+      var midDepth2 = wellDepth(wx2, 0);
+      var glow2 = clamp(midDepth2 * 1.4, 0, 1);
+      var alpha2 = 0.18 + glow2 * 0.55;
+      ctx.strokeStyle = "rgba(" + Math.round(150 + glow2 * 105) + ","
+        + Math.round(120 + glow2 * 60) + ",255," + alpha2 + ")";
+      ctx.lineWidth = 1 + glow2 * 1.6;
+      ctx.stroke();
+    }
+  }
+
+  function drawCentralMass(time) {
+    var c = project(mass.x, mass.y);
+    var baseR = (0.10 + massFrac * 0.55) * proj.scale * 0.5;
+    baseR = Math.max(14, baseR);
+    var pulse = 1 + 0.05 * Math.sin(time * 0.002);
+    var r = baseR * pulse;
+
+    // halo
+    var halo = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r * 3.4);
+    halo.addColorStop(0, "rgba(200,150,255,0.55)");
+    halo.addColorStop(0.3, "rgba(160,110,255,0.30)");
+    halo.addColorStop(1, "rgba(120,80,200,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r * 3.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // sphere body
+    var body = ctx.createRadialGradient(
+      c.x - r * 0.35, c.y - r * 0.4, r * 0.1,
+      c.x, c.y, r);
+    body.addColorStop(0, "#ffffff");
+    body.addColorStop(0.45, "#d4a8ff");
+    body.addColorStop(1, "#5a2da0");
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // rim light
+    ctx.strokeStyle = "rgba(224,179,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  function drawMarbles(time) {
+    var i, k;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // trails
+    for (i = 0; i < marbles.length; i++) {
+      var m = marbles[i];
+      var t = m.trail;
+      if (t.length >= 4) {
+        var segs = t.length / 2 - 1;
+        for (k = 0; k < segs; k++) {
+          var frac = k / segs;
+          var p1 = project(t[k * 2], t[k * 2 + 1]);
+          var p2 = project(t[k * 2 + 2], t[k * 2 + 3]);
+          ctx.globalAlpha = 0.05 + frac * frac * 0.55;
+          ctx.lineWidth = 0.6 + frac * 4;
+          ctx.strokeStyle = "hsl(" + m.hue + "," + m.sat + "%," + m.lit + "%)";
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // marble bodies
+    for (i = 0; i < marbles.length; i++) {
+      var mm = marbles[i];
+      var p = project(mm.x, mm.y);
+      var sr = Math.max(4, mm.r * proj.scale * p.persp);
+
+      var glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, sr * 3);
+      glow.addColorStop(0, "hsla(" + mm.hue + "," + mm.sat + "%,80%,0.5)");
+      glow.addColorStop(1, "hsla(" + mm.hue + "," + mm.sat + "%,80%,0)");
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sr * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      var body = ctx.createRadialGradient(
+        p.x - sr * 0.35, p.y - sr * 0.35, 0, p.x, p.y, sr);
+      body.addColorStop(0, "hsl(" + mm.hue + "," + mm.sat + "%,88%)");
+      body.addColorStop(1, "hsl(" + mm.hue + "," + mm.sat + "%," + mm.lit + "%)");
+      ctx.fillStyle = body;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sr, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.beginPath();
+      ctx.arc(p.x - sr * 0.32, p.y - sr * 0.32, sr * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // aiming preview
+  var aiming = false;
+  var aimPointerId = null;
+  var aimStart = { x: 0, y: 0 };   // screen coords
+  var aimNow = { x: 0, y: 0 };
+
+  function drawAim() {
+    if (!aiming) return;
+    var dx = aimStart.x - aimNow.x;
+    var dy = aimStart.y - aimNow.y;
+    ctx.setLineDash([7, 7]);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "rgba(224,179,255,0.7)";
+    ctx.beginPath();
+    ctx.moveTo(aimNow.x, aimNow.y);
+    ctx.lineTo(aimStart.x, aimStart.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len > 6) {
+      var ang = Math.atan2(dy, dx);
+      var ah = 13;
+      ctx.fillStyle = "rgba(224,179,255,0.9)";
+      ctx.beginPath();
+      ctx.moveTo(aimStart.x, aimStart.y);
+      ctx.lineTo(aimStart.x - ah * Math.cos(ang - 0.4), aimStart.y - ah * Math.sin(ang - 0.4));
+      ctx.lineTo(aimStart.x - ah * Math.cos(ang + 0.4), aimStart.y - ah * Math.sin(ang + 0.4));
+      ctx.closePath();
+      ctx.fill();
+    }
+    // ghost marble at start
+    var pg = ctx.createRadialGradient(aimNow.x, aimNow.y, 0, aimNow.x, aimNow.y, 16);
+    pg.addColorStop(0, "rgba(255,255,255,0.9)");
+    pg.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.arc(aimNow.x, aimNow.y, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(aimNow.x, aimNow.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function draw(time) {
+    drawBackground(time);
+    drawGrid(time);
+    drawCentralMass(time);
+    drawMarbles(time);
+    drawAim();
+  }
+
+  // ---- main loop ----
+  function frame(time) {
+    var sub = DT / SUBSTEPS;
+    for (var s = 0; s < SUBSTEPS; s++) {
+      step(sub);
+    }
+    recordTrails();
+    draw(time);
+    requestAnimationFrame(frame);
+  }
+
+  // ---- screen <-> world conversion ----
+  // Invert the flat part of the projection (ignore the well dip — good enough
+  // for placing a marble where the child taps).
+  function screenToWorld(sx, sy) {
+    // first guess assuming near row (persp ~ 1)
+    var wy = (sy - proj.cy) / (proj.scale * proj.tilt);
+    wy = clamp(wy, -1.3, 1.3);
+    // iterate to account for perspective shrink in x
+    var wx = 0;
+    for (var it = 0; it < 4; it++) {
+      var t = (wy + proj.halfW) / (2 * proj.halfW);
+      t = clamp(t, -0.4, 1.4);
+      var persp = proj.depthScale + (1 - proj.depthScale) * t;
+      wx = (sx - proj.cx) / (proj.scale * persp);
+    }
+    return { x: wx, y: wy };
+  }
+
+  // ---- input ----
+  function pointFromEvent(e) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    if (aiming) return;
+    var pt = pointFromEvent(e);
+    aiming = true;
+    aimPointerId = e.pointerId;
+    aimStart.x = pt.x; aimStart.y = pt.y;
+    aimNow.x = pt.x; aimNow.y = pt.y;
+    if (canvas.setPointerCapture) {
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (!aiming || e.pointerId !== aimPointerId) return;
+    e.preventDefault();
+    var pt = pointFromEvent(e);
+    aimNow.x = pt.x; aimNow.y = pt.y;
+  });
+
+  function endAim(e) {
+    if (!aiming || e.pointerId !== aimPointerId) return;
+    e.preventDefault();
+    aiming = false;
+    aimPointerId = null;
+
+    // marble starts where the pointer currently is; velocity along the flick.
+    var startW = screenToWorld(aimNow.x, aimNow.y);
+    var endW = screenToWorld(aimStart.x, aimStart.y);
+    // flick direction = from aimNow toward aimStart (pull-back style)
+    var vx = (aimStart.x - aimNow.x);
+    var vy = (aimStart.y - aimNow.y);
+    var pxLen = Math.sqrt(vx * vx + vy * vy);
+
+    // convert screen drag to world velocity
+    var velScale = 2.4 / proj.scale;
+    var wvx = vx * velScale;
+    var wvy = (vy * velScale) / proj.tilt;
+
+    if (pxLen < 8) {
+      // a tap: drop a marble that gets a gentle sideways nudge for an orbit
+      var dx = startW.x - mass.x;
+      var dy = startW.y - mass.y;
+      var r = Math.sqrt(dx * dx + dy * dy) || 0.001;
+      // tangential direction
+      var orbitSpeed = Math.sqrt((0.10 + massFrac * 2.6) / r) * 0.85;
+      wvx = -dy / r * orbitSpeed;
+      wvy = dx / r * orbitSpeed;
+    }
+
+    // don't spawn right on top of the mass
+    var ddx = startW.x - mass.x, ddy = startW.y - mass.y;
+    if (ddx * ddx + ddy * ddy < 0.02) {
+      startW.x += 0.25;
+    }
+
+    if (marbles.length > 40) marbles.shift();
+    marbles.push(makeMarble(startW.x, startW.y, wvx, wvy));
+  }
+
+  canvas.addEventListener("pointerup", endAim);
+  canvas.addEventListener("pointercancel", function (e) {
+    if (aiming && e.pointerId === aimPointerId) {
+      aiming = false;
+      aimPointerId = null;
+    }
+  });
+
+  // ---- controls ----
+  massSlider.addEventListener("input", function () {
+    var v = parseFloat(massSlider.value);
+    if (isNaN(v)) v = 55;
+    massFrac = clamp(v / 100, 0, 1);
+  });
+
+  document.getElementById("clear").addEventListener("click", function () {
+    marbles = [];
+  });
+
+  var howBtn = document.getElementById("howBtn");
+  var howPanel = document.getElementById("howPanel");
+  howBtn.addEventListener("click", function () {
+    howPanel.classList.toggle("show");
+  });
+
+  // ---- seed a couple of pleasant orbits ----
+  function seed() {
+    var radii = [0.42, 0.62];
+    for (var i = 0; i < radii.length; i++) {
+      var ang = rand(0, Math.PI * 2);
+      var r = radii[i];
+      var x = mass.x + Math.cos(ang) * r;
+      var y = mass.y + Math.sin(ang) * r;
+      var orbitSpeed = Math.sqrt((0.10 + massFrac * 2.6) / r) * 0.92;
+      var dir = i % 2 === 0 ? 1 : -1;
+      var vx = -Math.sin(ang) * orbitSpeed * dir;
+      var vy = Math.cos(ang) * orbitSpeed * dir;
+      marbles.push(makeMarble(x, y, vx, vy));
+    }
+  }
+
+  // ---- boot ----
+  window.addEventListener("resize", resize);
+  resize();
+  massFrac = clamp(parseFloat(massSlider.value) / 100, 0, 1);
+  seed();
+  requestAnimationFrame(function () {
+    requestAnimationFrame(frame);
+  });
+  requestAnimationFrame(function () {
+    stage.classList.add("ready");
+  });
+})();
+</script>
+</body>
+</html>

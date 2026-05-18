@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: States of Matter
-description: A heat-it-up sandbox — slide from cold to hot and watch particles change from a solid to a liquid to a gas.
+description: A heat-it-up sandbox — slide from cold to hot, watch the temperature number climb, see particles melt and boil, and tap inside the box to add heat right where you touch.
 emoji: 🔥
 color: orange
 -->
@@ -216,10 +216,12 @@ color: orange
   <p><b>Cold:</b> they hold still in a neat grid — a solid.</p>
   <p><b>Warm:</b> they slide past each other — a liquid.</p>
   <p><b>Hot:</b> they zoom everywhere and bounce — a gas!</p>
+  <p>Watch the thermometer number. Going up: <b>melting</b> then <b>boiling</b>. Going down: <b>condensing</b> then <b>freezing</b>.</p>
+  <p>Tap inside the box to add a splash of heat right where you touch! 👆</p>
 </div>
 
 <div id="dock">
-  <div id="hint">Slide to add heat 🔥</div>
+  <div id="hint">Slide to add heat 🔥 — or tap inside the box! 👆</div>
   <div id="sliderWrap">
     <span class="end">❄️ Cold</span>
     <input id="heatSlider" type="range" min="0" max="1000" value="120" aria-label="Temperature">
@@ -251,6 +253,21 @@ color: orange
 
   // the box that contains the particles
   var box = { x: 0, y: 0, w: 0, h: 0 };
+
+  // transition banner: shows "Melting!" etc. for a short time
+  var lastState = "";          // last settled state name
+  var transitionText = "";     // current transition label
+  var transitionTimer = 0;     // seconds remaining to show it
+  var prevHeat = 0;            // heat last frame, to know direction
+
+  // tap ripples: visual feedback for local heat taps
+  var ripples = [];
+
+  // temperature display range (kid-friendly Celsius-ish numbers)
+  var TEMP_MIN = -20, TEMP_MAX = 320;
+  function tempFromHeat(h) {
+    return Math.round(TEMP_MIN + clamp(0, h, 1) * (TEMP_MAX - TEMP_MIN));
+  }
 
   var COLS = 10, ROWS = 10;          // lattice grid -> 100 particles
   var particles = [];
@@ -301,7 +318,8 @@ color: orange
         y: h.y + rand(-2, 2),
         vx: rand(-8, 8),
         vy: rand(-8, 8),
-        phase: rand(0, Math.PI * 2) // for vibration variety
+        phase: rand(0, Math.PI * 2), // for vibration variety
+        boost: 0 // local heat from a tap; decays over time
       });
     }
   }
@@ -331,15 +349,33 @@ color: orange
 
   // ---- physics ----
   function step(dt, time) {
+    prevHeat = heat;
     // ease heat toward target
     heat += (targetHeat - heat) * Math.min(1, dt * 2.4);
+
+    // detect a state change and name the transition
+    var curState = stateName(heat);
+    if (curState !== lastState) {
+      if (lastState !== "") {
+        var goingUp = heat > prevHeat;
+        if (curState === "Liquid" && lastState === "Solid") transitionText = "🫠 Melting!";
+        else if (curState === "Solid" && lastState === "Liquid") transitionText = "❄️ Freezing!";
+        else if (curState === "Gas" && lastState === "Liquid") transitionText = "♨️ Boiling!";
+        else if (curState === "Liquid" && lastState === "Gas") transitionText = "💧 Condensing!";
+        else transitionText = goingUp ? "♨️ Heating up!" : "❄️ Cooling down!";
+        transitionTimer = 2.2;
+      }
+      lastState = curState;
+    }
+    if (transitionTimer > 0) transitionTimer = Math.max(0, transitionTimer - dt);
 
     var n = particles.length;
     // regime weights
     // solidW: 1 at heat 0 -> 0 at heat ~0.4
     var solidW = clamp(0, (0.42 - heat) / 0.42, 1);
-    // gasW: 0 until ~0.6 -> 1 at heat 1
-    var gasW = clamp(0, (heat - 0.58) / 0.42, 1);
+    // gasW: 0 until ~0.5 -> fully gas by heat 0.66, so the particles look
+    // like a real gas (filling the box) as soon as the label says "Gas".
+    var gasW = clamp(0, (heat - 0.5) / 0.16, 1);
     // liquidW: the middle
     var liquidW = clamp(0, 1 - solidW - gasW, 1);
 
@@ -409,6 +445,16 @@ color: orange
 
       // --- random thermal kicks (more when hot) ---
       var kick = thermal * (0.4 + gasW * 0.6);
+      // local heat from a tap adds an extra burst to this particle
+      if (p.boost > 0.001) {
+        kick += p.boost * 900;
+        // a tap also nudges the particle loose from its lattice spot
+        if (solidW > 0.001) {
+          p.vx += rand(-1, 1) * p.boost * 260 * dt;
+          p.vy += rand(-1, 1) * p.boost * 260 * dt;
+        }
+        p.boost = Math.max(0, p.boost - dt * 0.9);
+      }
       p.vx += rand(-1, 1) * kick * dt;
       p.vy += rand(-1, 1) * kick * dt;
 
@@ -420,7 +466,7 @@ color: orange
 
       // --- speed cap so things stay stable ---
       var spd2 = p.vx * p.vx + p.vy * p.vy;
-      var maxSpd = 60 + heat * 620;
+      var maxSpd = 60 + heat * 620 + p.boost * 420;
       if (spd2 > maxSpd * maxSpd) {
         var s = maxSpd / Math.sqrt(spd2);
         p.vx *= s; p.vy *= s;
@@ -522,6 +568,21 @@ color: orange
       ctx.fill();
     }
 
+    // ---- tap ripples (heat splashes) ----
+    for (var ri = 0; ri < ripples.length; ri++) {
+      var rp = ripples[ri];
+      var k = 1 - rp.life / rp.maxLife; // 0 -> 1 as it expands
+      var rad = pr * 1.5 + k * pr * 6;
+      ctx.save();
+      ctx.globalAlpha = (1 - k) * 0.55;
+      ctx.strokeStyle = "#ff9434";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, rad, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // ---- thermometer ----
     drawThermometer();
 
@@ -533,6 +594,33 @@ color: orange
     ctx.font = "700 " + clamp(20, box.w * 0.11, 40) + "px system-ui, sans-serif";
     var labelY = box.y - clamp(10, H * 0.02, 18);
     ctx.fillText(emoji + "  " + name, box.x + box.w / 2, labelY);
+
+    // ---- transition banner (melting / boiling / etc.) ----
+    if (transitionTimer > 0 && transitionText) {
+      var fade = Math.min(1, transitionTimer / 0.5); // fade out at the end
+      var tFs = clamp(18, box.w * 0.085, 32);
+      ctx.font = "800 " + tFs + "px system-ui, sans-serif";
+      var ttw = ctx.measureText(transitionText).width;
+      var tbW = Math.min(W - 16, ttw + 36);
+      var tbH = tFs + 18;
+      var tbX = box.x + box.w / 2 - tbW / 2;
+      if (tbX < 8) tbX = 8;
+      if (tbX + tbW > W - 8) tbX = W - 8 - tbW;
+      var tbY = box.y + box.h * 0.5 - tbH / 2;
+      ctx.save();
+      ctx.globalAlpha = fade;
+      roundRect(tbX, tbY, tbW, tbH, tbH / 2);
+      ctx.fillStyle = "rgba(20,10,4,0.9)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,169,77,0.85)";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.fillStyle = "#ffd166";
+      ctx.textBaseline = "middle";
+      ctx.fillText(transitionText, tbX + tbW / 2, tbY + tbH / 2 + 1);
+      ctx.textBaseline = "alphabetic";
+      ctx.restore();
+    }
     ctx.textAlign = "left";
   }
 
@@ -588,6 +676,32 @@ color: orange
       ctx.lineTo(tx + 2, ty);
       ctx.stroke();
     }
+
+    // temperature number, in a little pill above the thermometer
+    var temp = tempFromHeat(heat);
+    var label = temp + "°";
+    var fs = clamp(15, tw * 0.62, 24);
+    ctx.font = "800 " + fs + "px system-ui, sans-serif";
+    var lw = ctx.measureText(label).width;
+    var pillW = lw + 16;
+    var pillH = fs + 12;
+    var pillX = tx + tw / 2 - pillW / 2;
+    if (pillX + pillW > W - 4) pillX = W - 4 - pillW;
+    if (pillX < 4) pillX = 4;
+    var pillY = tubeTop - pillH - 6;
+    if (pillY < box.y - pillH - 2) pillY = box.y - pillH - 2;
+    roundRect(pillX, pillY, pillW, pillH, pillH / 2);
+    ctx.fillStyle = "rgba(20,10,4,0.92)";
+    ctx.fill();
+    ctx.strokeStyle = merc;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = "#fff1e6";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2 + 1);
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
   }
 
   function roundRect(x, y, w, h, r) {
@@ -611,6 +725,11 @@ color: orange
     for (var s = 0; s < steps; s++) {
       step(dt / steps, time);
     }
+    // age tap ripples
+    for (var ri = ripples.length - 1; ri >= 0; ri--) {
+      ripples[ri].life += dt;
+      if (ripples[ri].life >= ripples[ri].maxLife) ripples.splice(ri, 1);
+    }
     draw(time);
     requestAnimationFrame(frame);
   }
@@ -618,6 +737,31 @@ color: orange
   // ---- input ----
   slider.addEventListener("input", function () {
     targetHeat = parseFloat(slider.value) / SLIDER_MAX;
+  });
+
+  // tap (or drag) inside the box to add a splash of local heat
+  function addHeatAt(px, py) {
+    // ignore taps outside the box
+    if (px < box.x || px > box.x + box.w || py < box.y || py > box.y + box.h) return;
+    ripples.push({ x: px, y: py, life: 0, maxLife: 0.6 });
+    if (ripples.length > 24) ripples.shift();
+    var radius = Math.max(box.w * 0.22, 60);
+    var r2 = radius * radius;
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      var dx = p.x - px, dy = p.y - py;
+      var d2 = dx * dx + dy * dy;
+      if (d2 < r2) {
+        var falloff = 1 - Math.sqrt(d2) / radius; // 1 at centre -> 0 at edge
+        p.boost = Math.min(1.4, p.boost + falloff * 0.9);
+      }
+    }
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    var rect = canvas.getBoundingClientRect();
+    addHeatAt(e.clientX - rect.left, e.clientY - rect.top);
   });
 
   function nudge(delta) {

@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Simple Circuit
-description: A tap-to-light circuit lab — flip the switch to glow the bulb, watch current zip along the wires, and compare series vs. parallel.
+description: A tap-to-light circuit lab — flip the switch, slide the dimmer, watch the current meter, fix a broken wire, and compare series vs. parallel.
 emoji: 💡
 color: gold
 -->
@@ -116,6 +116,55 @@ color: gold
     -webkit-backdrop-filter: blur(10px);
     max-width: 92vw;
   }
+  /* dimmer slider lives in the bottom info bar */
+  #dimWrap {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid rgba(255, 210, 74, 0.30);
+    border-radius: 14px;
+    padding: 9px 15px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
+  #dimWrap .lbl {
+    font-size: clamp(13px, 3.4vw, 15px);
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  #dim {
+    -webkit-appearance: none;
+    appearance: none;
+    width: clamp(120px, 42vw, 220px);
+    height: 14px;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #6e5a22, #ffd24a);
+    outline: none;
+    margin: 0;
+  }
+  #dim::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff6df, #ffab2e);
+    border: 2px solid #fff6df;
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+  }
+  #dim::-moz-range-thumb {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff6df, #ffab2e);
+    border: 2px solid #fff6df;
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+  }
+  #dim:disabled { opacity: 0.4; }
   #howBtn { pointer-events: auto; }
   #howPanel {
     pointer-events: auto;
@@ -149,6 +198,7 @@ color: gold
   <div class="spacer"></div>
   <div class="controls">
     <button id="modeBtn" type="button">Mode: One Bulb</button>
+    <button id="challengeBtn" type="button">Fix the Wire</button>
   </div>
 </div>
 
@@ -156,10 +206,17 @@ color: gold
   <div id="howPanel">
     <p><b>Electricity flows in a loop.</b> When the switch is closed, current travels from the battery, through the wires, and lights the bulb.</p>
     <p><b>Open the switch</b> and the loop breaks — no current, no light.</p>
+    <p>The <b>dimmer slider</b> changes how much current flows — slide it up for a brighter bulb, down to dim it.</p>
+    <p>The <b>current meter</b> shows how much current is moving. More current means a brighter bulb!</p>
     <p><b>Series</b> puts two bulbs on one path, so they share the energy and look dimmer.</p>
     <p><b>Parallel</b> gives each bulb its own loop, so both shine full bright.</p>
+    <p><b>Fix the Wire:</b> a wire is secretly broken. Tap along the wires to find the gap and snap it shut!</p>
   </div>
   <div id="hint">Tap the switch to turn the circuit on and off</div>
+  <div id="dimWrap">
+    <span class="lbl">Dimmer</span>
+    <input id="dim" type="range" min="0" max="100" value="100" aria-label="Dimmer">
+  </div>
   <button id="howBtn" type="button">How it works</button>
 </div>
 
@@ -173,9 +230,11 @@ color: gold
   if (!ctx) return;
 
   var modeBtn = document.getElementById("modeBtn");
+  var challengeBtn = document.getElementById("challengeBtn");
   var hint = document.getElementById("hint");
   var howBtn = document.getElementById("howBtn");
   var howPanel = document.getElementById("howPanel");
+  var dim = document.getElementById("dim");
 
   var W = 0, H = 0, DPR = 1;
 
@@ -186,6 +245,20 @@ color: gold
   var switchAnim = 1;         // 0..1 animated lever position (1 = closed)
   var glow = 1;               // 0..1 animated brightness of the lit state
   var flow = 0;               // phase for current dots
+
+  // dimmer: 0..1 fraction of full current/brightness the user dialed in
+  var dimLevel = 1;
+  // smoothed current reading shown on the meter (0..1)
+  var meter = 1;
+
+  // "Fix the Wire" challenge
+  var challenge = false;      // challenge mode active?
+  var brokenSeg = -1;         // index into the wire-segment list that is broken
+  var brokenFixed = true;     // is the break repaired? (true when no challenge)
+  // collected tappable wire segments for this frame, for hit-testing
+  var wireSegs = [];
+  var sparkT = 0;             // little celebration timer when a fix succeeds
+  var brokenFixPt = null;     // {x,y} where the break was fixed, for the sparkle
 
   var MODE_LABELS = ["Mode: One Bulb", "Mode: Series", "Mode: Parallel"];
 
@@ -278,6 +351,7 @@ color: gold
 
   // --- drawing components ---
 
+  // Draw a plain wire segment (no break logic). Used for short stubs.
   function drawWire(x1, y1, x2, y2, lit) {
     ctx.lineCap = "round";
     ctx.lineWidth = 9;
@@ -290,6 +364,47 @@ color: gold
     ctx.beginPath();
     ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
     ctx.stroke();
+  }
+
+  // Draw a wire segment with a visible break in the middle (challenge mode).
+  function drawBrokenWire(x1, y1, x2, y2) {
+    var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / len, uy = dy / len;
+    var halfGap = Math.min(16, len * 0.32);
+    // two stubs, dark and dead
+    drawWire(x1, y1, mx - ux * halfGap, my - uy * halfGap, false);
+    drawWire(mx + ux * halfGap, my + uy * halfGap, x2, y2, false);
+    // glowing copper ends to draw the eye to the gap
+    ctx.fillStyle = "#ff8a3a";
+    ctx.beginPath();
+    ctx.arc(mx - ux * halfGap, my - uy * halfGap, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(mx + ux * halfGap, my + uy * halfGap, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    // tiny pulsing spark hint between the ends
+    var pulse = 0.45 + 0.35 * Math.sin(flow * 0.18);
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = "#ffe79a";
+    ctx.beginPath();
+    ctx.arc(mx, my, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Register a tappable loop wire segment AND draw it. If this segment is the
+  // hidden break and it is not yet fixed, it is drawn broken and reported so.
+  // Returns true if the segment conducts current.
+  function wire(idx, x1, y1, x2, y2, lit) {
+    wireSegs.push({ idx: idx, x1: x1, y1: y1, x2: x2, y2: y2 });
+    if (challenge && !brokenFixed && idx === brokenSeg) {
+      drawBrokenWire(x1, y1, x2, y2);
+      return false;
+    }
+    drawWire(x1, y1, x2, y2, lit);
+    return true;
   }
 
   // current dots travelling along a straight segment
@@ -538,8 +653,13 @@ color: gold
     }
     ctx.globalAlpha = 1;
 
-    var litWire = closed;
-    var br = closed ? glow : 0;
+    // a fresh list of tappable wires every frame
+    wireSegs = [];
+
+    // circuit only conducts when the switch is closed AND no break remains
+    var conducts = closed && brokenFixed;
+    var litWire = conducts;
+    var br = conducts ? glow * dimLevel : 0;
 
     if (mode === 0) {
       drawSingle(litWire, br);
@@ -548,6 +668,10 @@ color: gold
     } else {
       drawParallel(litWire, br);
     }
+
+    drawMeter();
+
+    if (challenge) drawChallengeBanner();
   }
 
   // SINGLE BULB ---------------------------------------------------------
@@ -569,20 +693,15 @@ color: gold
     var swX = right;
     var swW = Math.min(L.boxH * 0.3, 70);
 
-    // --- wires of the loop ---
-    // left edge (full)
-    drawWire(left, bottom, left, top, litWire && glow > 0.5);
-    // top-left to bulb
-    drawWire(left, top, bulbX - bulbSize * 0.42, top, litWire && glow > 0.5);
-    // bulb to top-right
-    drawWire(bulbX + bulbSize * 0.42, top, right, top, litWire && glow > 0.5);
-    // right edge top to switch
-    drawWire(right, top, right, swY - swW - 4, litWire && glow > 0.5);
-    // right edge switch to bottom
-    drawWire(right, swY + swW + 4, right, bottom, litWire && glow > 0.5);
-    // bottom edges into battery
-    drawWire(right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, litWire && glow > 0.5);
-    drawWire(batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, litWire && glow > 0.5);
+    var wl = litWire && glow > 0.5;
+    // --- wires of the loop (each is a tappable, breakable segment) ---
+    wire(0, left, bottom, left, top, wl);
+    wire(1, left, top, bulbX - bulbSize * 0.42, top, wl);
+    wire(2, bulbX + bulbSize * 0.42, top, right, top, wl);
+    wire(3, right, top, right, swY - swW - 4, wl);
+    wire(4, right, swY + swW + 4, right, bottom, wl);
+    wire(5, right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, wl);
+    wire(6, batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, wl);
 
     // --- current dots ---
     // route: along the loop minus the bulb/battery/switch gaps; we just animate
@@ -596,9 +715,9 @@ color: gold
       [right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, -1],
       [batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, -1]
     ];
-    if (closed) {
+    if (closed && brokenFixed) {
       for (var s = 0; s < seg.length; s++) {
-        drawCurrentOnSegment(seg[s][0], seg[s][1], seg[s][2], seg[s][3], seg[s][4], glow);
+        drawCurrentOnSegment(seg[s][0], seg[s][1], seg[s][2], seg[s][3], seg[s][4], glow * dimLevel);
       }
     }
 
@@ -629,16 +748,16 @@ color: gold
     var seriesBr = br * 0.5;
     var wireLit = litWire && glow > 0.5;
 
-    drawWire(left, bottom, left, top, wireLit);
-    drawWire(left, top, b1X - bulbSize * 0.42, top, wireLit);
-    drawWire(b1X + bulbSize * 0.42, top, b2X - bulbSize * 0.42, top, wireLit);
-    drawWire(b2X + bulbSize * 0.42, top, right, top, wireLit);
-    drawWire(right, top, right, swY - swW - 4, wireLit);
-    drawWire(right, swY + swW + 4, right, bottom, wireLit);
-    drawWire(right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, wireLit);
-    drawWire(batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, wireLit);
+    wire(0, left, bottom, left, top, wireLit);
+    wire(1, left, top, b1X - bulbSize * 0.42, top, wireLit);
+    wire(2, b1X + bulbSize * 0.42, top, b2X - bulbSize * 0.42, top, wireLit);
+    wire(3, b2X + bulbSize * 0.42, top, right, top, wireLit);
+    wire(4, right, top, right, swY - swW - 4, wireLit);
+    wire(5, right, swY + swW + 4, right, bottom, wireLit);
+    wire(6, right, bottom, batX + batW / 2 + L.boxW * 0.04, bottom, wireLit);
+    wire(7, batX - batW / 2 - L.boxW * 0.04, bottom, left, bottom, wireLit);
 
-    if (closed) {
+    if (closed && brokenFixed) {
       var seg = [
         [left, bottom, left, top, 1],
         [left, top, b1X - bulbSize * 0.42, top, 1],
@@ -651,7 +770,7 @@ color: gold
       ];
       // series current is smaller -> fewer/dimmer dots
       for (var s = 0; s < seg.length; s++) {
-        drawCurrentOnSegment(seg[s][0], seg[s][1], seg[s][2], seg[s][3], seg[s][4], glow * 0.6);
+        drawCurrentOnSegment(seg[s][0], seg[s][1], seg[s][2], seg[s][3], seg[s][4], glow * dimLevel * 0.6);
       }
     }
 
@@ -686,36 +805,37 @@ color: gold
     var railBot = bottom;
 
     // outer loop wires
-    drawWire(left, railBot, left, railTop, wireLit);          // left side
-    drawWire(left, railTop, right, railTop, wireLit);          // top rail
-    drawWire(right, railTop, right, swY - swW - 4, wireLit);   // right top to switch
-    drawWire(right, swY + swW + 4, right, railBot, wireLit);   // switch to bottom
-    drawWire(right, railBot, batX + batW / 2 + L.boxW * 0.04, railBot, wireLit);
-    drawWire(batX - batW / 2 - L.boxW * 0.04, railBot, left, railBot, wireLit);
+    wire(0, left, railBot, left, railTop, wireLit);          // left side
+    wire(1, left, railTop, right, railTop, wireLit);          // top rail
+    wire(2, right, railTop, right, swY - swW - 4, wireLit);   // right top to switch
+    wire(3, right, swY + swW + 4, right, railBot, wireLit);   // switch to bottom
+    wire(4, right, railBot, batX + batW / 2 + L.boxW * 0.04, railBot, wireLit);
+    wire(5, batX - batW / 2 - L.boxW * 0.04, railBot, left, railBot, wireLit);
 
     // two branch wires (vertical) each with a bulb in the middle
     var bulbY = midY;
     // branch 1
-    drawWire(branch1X, railTop, branch1X, bulbY - bulbSize * 0.42, wireLit);
-    drawWire(branch1X, bulbY + bulbSize * 0.42, branch1X, railBot, wireLit);
+    wire(6, branch1X, railTop, branch1X, bulbY - bulbSize * 0.42, wireLit);
+    wire(7, branch1X, bulbY + bulbSize * 0.42, branch1X, railBot, wireLit);
     // branch 2
-    drawWire(branch2X, railTop, branch2X, bulbY - bulbSize * 0.42, wireLit);
-    drawWire(branch2X, bulbY + bulbSize * 0.42, branch2X, railBot, wireLit);
+    wire(8, branch2X, railTop, branch2X, bulbY - bulbSize * 0.42, wireLit);
+    wire(9, branch2X, bulbY + bulbSize * 0.42, branch2X, railBot, wireLit);
 
     // current dots: main rails + each branch (full brightness in parallel)
-    if (closed) {
+    if (closed && brokenFixed) {
+      var pg = glow * dimLevel;
       // top rail dots flow left->right toward branches then down
-      drawCurrentOnSegment(left, railTop, right, railTop, 1, glow);
-      drawCurrentOnSegment(left, railBot, left, railTop, 1, glow);
-      drawCurrentOnSegment(right, railTop, right, swY - swW - 4, 1, glow);
-      drawCurrentOnSegment(right, swY + swW + 4, right, railBot, 1, glow);
-      drawCurrentOnSegment(right, railBot, batX + batW / 2 + L.boxW * 0.04, railBot, -1, glow);
-      drawCurrentOnSegment(batX - batW / 2 - L.boxW * 0.04, railBot, left, railBot, -1, glow);
+      drawCurrentOnSegment(left, railTop, right, railTop, 1, pg);
+      drawCurrentOnSegment(left, railBot, left, railTop, 1, pg);
+      drawCurrentOnSegment(right, railTop, right, swY - swW - 4, 1, pg);
+      drawCurrentOnSegment(right, swY + swW + 4, right, railBot, 1, pg);
+      drawCurrentOnSegment(right, railBot, batX + batW / 2 + L.boxW * 0.04, railBot, -1, pg);
+      drawCurrentOnSegment(batX - batW / 2 - L.boxW * 0.04, railBot, left, railBot, -1, pg);
       // branches: current flows down through each
-      drawCurrentOnSegment(branch1X, railTop, branch1X, bulbY - bulbSize * 0.42, 1, glow);
-      drawCurrentOnSegment(branch1X, bulbY + bulbSize * 0.42, branch1X, railBot, 1, glow);
-      drawCurrentOnSegment(branch2X, railTop, branch2X, bulbY - bulbSize * 0.42, 1, glow);
-      drawCurrentOnSegment(branch2X, bulbY + bulbSize * 0.42, branch2X, railBot, 1, glow);
+      drawCurrentOnSegment(branch1X, railTop, branch1X, bulbY - bulbSize * 0.42, 1, pg);
+      drawCurrentOnSegment(branch1X, bulbY + bulbSize * 0.42, branch1X, railBot, 1, pg);
+      drawCurrentOnSegment(branch2X, railTop, branch2X, bulbY - bulbSize * 0.42, 1, pg);
+      drawCurrentOnSegment(branch2X, bulbY + bulbSize * 0.42, branch2X, railBot, 1, pg);
     }
 
     drawBattery(batX, batY, batW);
@@ -725,6 +845,142 @@ color: gold
     drawBulb(branch2X, bulbY, bulbSize, br);
 
     drawModeTag("PARALLEL — each bulb has its own loop, so both are bright");
+  }
+
+  // --- current meter (ammeter) -----------------------------------------
+  // A little gauge in the lower-left corner. The needle swings with current.
+  function drawMeter() {
+    var size = Math.max(96, Math.min(150, L.unit * 0.42));
+    // The controls (hint pill, dimmer, How it works) overlay the bottom of the
+    // canvas. Measure where they actually start so the meter never tucks
+    // underneath them — the panel grows taller when its buttons wrap on mobile.
+    var ctrls = document.getElementById("info");
+    var safeBottom = H - 96;
+    if (ctrls) {
+      var cr = ctrls.getBoundingClientRect();
+      var cv = document.getElementById("c").getBoundingClientRect();
+      var ctrlsTop = cr.top - cv.top;
+      if (ctrlsTop > 0 && ctrlsTop - 12 < safeBottom) safeBottom = ctrlsTop - 12;
+    }
+    // if the meter can't fit at full size, shrink it to the available band
+    var avail = safeBottom - 70;
+    if (size > avail) size = Math.max(72, avail);
+    var mx = 14 + size / 2;
+    var my = H - 14 - size / 2;
+    // keep clear of the controls bar at the bottom (esp. on short screens)
+    if (my + size / 2 > safeBottom) my = safeBottom - size / 2;
+    if (my - size / 2 < 70) my = 70 + size / 2;
+
+    // dial face
+    ctx.fillStyle = "rgba(38,31,12,0.9)";
+    roundRect(mx - size / 2, my - size / 2, size, size, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,210,74,0.34)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    var cx = mx, cy = my + size * 0.24;
+    var rad = size * 0.34;
+    // a clean 180-degree gauge: needle swings from left (PI) to right (2*PI)
+    var startA = Math.PI;
+    var sweep = Math.PI;
+
+    // arc track
+    ctx.lineCap = "round";
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "rgba(255,231,154,0.25)";
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, startA, startA + sweep, false);
+    ctx.stroke();
+
+    // colored fill up to the current reading
+    var frac = meter < 0 ? 0 : (meter > 1 ? 1 : meter);
+    if (frac > 0.02) {
+      ctx.strokeStyle = "hsl(" + Math.round(20 + frac * 28) + ",100%,58%)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, rad, startA, startA + sweep * frac, false);
+      ctx.stroke();
+    }
+
+    // needle
+    var na = startA + sweep * frac;
+    var nx = cx + Math.cos(na) * rad * 0.92;
+    var ny = cy + Math.sin(na) * rad * 0.92;
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = "#fff6df";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(nx, ny);
+    ctx.stroke();
+    ctx.fillStyle = "#ffd24a";
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // label + reading
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#d8c98f";
+    ctx.font = "600 " + Math.round(size * 0.12) + "px system-ui, sans-serif";
+    ctx.fillText("CURRENT", mx, my - size * 0.30);
+    ctx.fillStyle = frac > 0.02 ? "#ffe79a" : "#9b8a4f";
+    ctx.font = "bold " + Math.round(size * 0.20) + "px system-ui, sans-serif";
+    ctx.fillText((frac * 5).toFixed(1) + " A", mx, my + size * 0.40);
+  }
+
+  // banner shown during the Fix the Wire challenge
+  function drawChallengeBanner() {
+    var solved = brokenFixed;
+    var text = solved ? "Fixed it! The light is back on" : "A wire is broken — tap to find the gap";
+    ctx.font = "700 " + Math.round(Math.max(13, L.unit * 0.052)) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    var w = ctx.measureText(text).width + 30;
+    if (w > W - 24) w = W - 24;
+    var x = W / 2 - w / 2;
+    // sit just below the HUD so it never overlaps wrapped controls
+    var hudEl = document.getElementById("hud");
+    var hudH = hudEl ? hudEl.getBoundingClientRect().height : 64;
+    var y = hudH + 30;
+    if (y > H - 130) y = H - 130;
+    ctx.fillStyle = solved ? "rgba(60,49,18,0.95)" : "rgba(70,30,10,0.92)";
+    roundRect(x, y - 24, w, 34, 12);
+    ctx.fill();
+    ctx.strokeStyle = solved ? "rgba(255,210,74,0.5)" : "rgba(255,138,58,0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = solved ? "#ffe79a" : "#ffd0a6";
+    ctx.fillText(text, W / 2, y);
+
+    // celebratory sparkle burst when freshly fixed
+    if (sparkT > 0 && brokenFixPt) {
+      var p = 1 - sparkT;
+      var n = 9;
+      for (var i = 0; i < n; i++) {
+        var ang = (i / n) * Math.PI * 2;
+        var dist = 8 + p * 46;
+        var sx = brokenFixPt.x + Math.cos(ang) * dist;
+        var sy = brokenFixPt.y + Math.sin(ang) * dist;
+        ctx.globalAlpha = sparkT;
+        ctx.fillStyle = "#fff4c0";
+        ctx.beginPath();
+        ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // distance from point p to segment seg
+  function distToSeg(px, py, seg) {
+    var vx = seg.x2 - seg.x1, vy = seg.y2 - seg.y1;
+    var wx = px - seg.x1, wy = py - seg.y1;
+    var len2 = vx * vx + vy * vy;
+    var t = len2 > 0 ? (wx * vx + wy * vy) / len2 : 0;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    var cxp = seg.x1 + vx * t, cyp = seg.y1 + vy * t;
+    var dx = px - cxp, dy = py - cyp;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   function drawModeTag(text) {
@@ -754,8 +1010,22 @@ color: gold
     var gTarget = closed ? 1 : 0;
     glow += (gTarget - glow) * 0.14;
     glow = clamp01(glow);
-    // flow advances only when current flows
-    if (closed) flow += 1.7 + glow * 1.2;
+
+    // the meter follows the actual current flowing in the circuit
+    var conducting = closed && brokenFixed;
+    var meterTarget = conducting ? glow * dimLevel : 0;
+    if (mode === 1) meterTarget *= 0.6; // series draws less current
+    meter += (meterTarget - meter) * 0.16;
+    meter = clamp01(meter);
+
+    // flow advances only when current actually flows
+    if (conducting) flow += 1.7 + glow * dimLevel * 1.2;
+
+    // sparkle fades out after a successful fix
+    if (sparkT > 0) {
+      sparkT -= 0.018;
+      if (sparkT < 0) sparkT = 0;
+    }
 
     drawScene(time);
     requestAnimationFrame(frame);
@@ -768,10 +1038,36 @@ color: gold
   }
 
   function handleTap(pt) {
-    // tapping near the switch toggles it
+    // tapping near the switch always toggles it
     var dx = pt.x - switchHit.x;
     var dy = pt.y - switchHit.y;
-    if (dx * dx + dy * dy < switchHit.r * switchHit.r) {
+    var onSwitch = (dx * dx + dy * dy < switchHit.r * switchHit.r);
+
+    if (challenge && !brokenFixed) {
+      // during the hunt, look for a tap on the broken wire segment
+      var best = null, bestD = 999999;
+      for (var i = 0; i < wireSegs.length; i++) {
+        if (wireSegs[i].idx !== brokenSeg) continue;
+        var d = distToSeg(pt.x, pt.y, wireSegs[i]);
+        if (d < bestD) { bestD = d; best = wireSegs[i]; }
+      }
+      if (best && bestD < 40) {
+        brokenFixed = true;
+        brokenFixPt = {
+          x: (best.x1 + best.x2) / 2,
+          y: (best.y1 + best.y2) / 2
+        };
+        sparkT = 1;
+        hint.textContent = "You fixed the wire! Current is flowing again";
+        return;
+      }
+      // not the broken wire — let the switch still work, but don't toggle on a miss
+      if (onSwitch) { closed = !closed; updateHint(); }
+      else { hint.textContent = "Not there — keep tapping along the wires"; }
+      return;
+    }
+
+    if (onSwitch) {
       closed = !closed;
       updateHint();
       return;
@@ -781,8 +1077,34 @@ color: gold
     updateHint();
   }
 
+  function startChallenge() {
+    challenge = true;
+    brokenFixed = false;
+    brokenFixPt = null;
+    sparkT = 0;
+    closed = true; // switch on, so the only thing keeping the bulb dark is the break
+    // pick a random wire segment for the current mode's loop
+    var counts = [7, 8, 10];
+    brokenSeg = Math.floor(Math.random() * counts[mode]);
+    challengeBtn.textContent = "Stop Challenge";
+    challengeBtn.classList.add("on");
+    hint.textContent = "A wire is broken! Tap along the wires to find the gap";
+  }
+
+  function stopChallenge() {
+    challenge = false;
+    brokenFixed = true;
+    brokenSeg = -1;
+    sparkT = 0;
+    challengeBtn.textContent = "Fix the Wire";
+    challengeBtn.classList.remove("on");
+    updateHint();
+  }
+
   function updateHint() {
-    if (closed) {
+    if (challenge && !brokenFixed) {
+      hint.textContent = "A wire is broken! Tap along the wires to find the gap";
+    } else if (closed) {
       hint.textContent = "Circuit ON — tap again to break the loop";
     } else {
       hint.textContent = "Circuit OFF — tap to close the switch";
@@ -797,6 +1119,26 @@ color: gold
   modeBtn.addEventListener("click", function () {
     mode = (mode + 1) % 3;
     modeBtn.textContent = MODE_LABELS[mode];
+    // if a challenge is running, pick a fresh break valid for the new mode
+    if (challenge) {
+      var counts = [7, 8, 10];
+      brokenSeg = Math.floor(Math.random() * counts[mode]);
+      brokenFixed = false;
+      brokenFixPt = null;
+      sparkT = 0;
+      hint.textContent = "New circuit, new broken wire — tap to find it";
+    }
+  });
+
+  challengeBtn.addEventListener("click", function () {
+    if (challenge) stopChallenge();
+    else startChallenge();
+  });
+
+  dim.addEventListener("input", function () {
+    var v = parseInt(dim.value, 10);
+    if (isNaN(v)) v = 100;
+    dimLevel = v / 100;
   });
 
   howBtn.addEventListener("click", function () {
@@ -807,6 +1149,10 @@ color: gold
   window.addEventListener("resize", resize);
 
   // --- boot ---
+  (function initDim() {
+    var v = parseInt(dim.value, 10);
+    dimLevel = isNaN(v) ? 1 : v / 100;
+  })();
   resize();
   updateHint();
   requestAnimationFrame(frame);

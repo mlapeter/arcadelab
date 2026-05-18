@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Steam Engine
-description: A see-through steam engine — turn up the fire to boil water, push the piston with steam, and spin the giant flywheel faster and faster.
+description: A see-through steam engine — turn up the fire to boil water, watch the pressure gauge climb, spin the giant flywheel and its governor balls, and tap the engine for a steam whistle.
 emoji: 🚂
 color: red
 -->
@@ -147,10 +147,22 @@ color: red
     min-width: 3ch;
     text-align: right;
   }
+  #hint {
+    background: var(--panel);
+    border: 1px solid rgba(255, 107, 77, 0.22);
+    border-radius: 13px;
+    padding: 7px 14px;
+    font-size: clamp(12px, 3.3vw, 14px);
+    color: var(--muted);
+    text-align: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 92vw;
+  }
   #howPanel {
     position: fixed;
     left: 50%;
-    bottom: clamp(108px, 24vw, 132px);
+    bottom: clamp(150px, 30vw, 178px);
     transform: translateX(-50%) translateY(12px);
     width: min(420px, 90vw);
     background: var(--panel);
@@ -187,9 +199,10 @@ color: red
 <div id="howPanel">
   <h2>How it works</h2>
   <p>The fire heats water in the boiler until it turns into steam.</p>
-  <p>Steam takes up lots of room, so it pushes the piston along the cylinder.</p>
-  <p>The piston pushes a rod that turns the crank, spinning the heavy flywheel round and round.</p>
-  <p>More fire makes more steam — and a faster flywheel!</p>
+  <p>Steam takes up lots of room, so it pushes the piston along the cylinder — that's the "PUSH" stroke. The flywheel carries it back on the "RETURN" stroke.</p>
+  <p>The piston turns the crank, spinning the heavy flywheel round and round.</p>
+  <p>The pressure gauge climbs as the boiler heats up, and the spinning governor balls fly outward when the engine runs fast.</p>
+  <p>More fire makes more steam — and a faster flywheel! Tap the engine to blow the steam whistle.</p>
 </div>
 
 <div id="info">
@@ -198,6 +211,7 @@ color: red
     <input id="heat" type="range" min="0" max="100" value="55" step="1" aria-label="Heat">
     <span id="heatVal">55</span>
   </div>
+  <div id="hint">Tap the engine to blow the steam whistle 📣</div>
 </div>
 
 <script>
@@ -217,6 +231,8 @@ color: red
   var heat = 55;          // 0..100
   var crankAngle = 0;     // radians
   var crankSpeed = 0;     // radians/sec
+  var pressure = 0;       // 0..100, eases up toward heat (boiler takes time to build)
+  var govAngle = 0;       // governor spin angle (radians)
 
   // particle pools
   var steamParticles = [];
@@ -231,7 +247,7 @@ color: red
     // Engine fits inside a centered region. We design in a virtual frame and
     // place it. Reserve top space for HUD and bottom for the heat slider.
     var topPad = 84;
-    var botPad = 150;
+    var botPad = 188;
     var availH = Math.max(120, H - topPad - botPad);
     var availW = W * 0.94;
 
@@ -293,6 +309,39 @@ color: red
       var over = (L.fly.cx + flyR) - (W - 8);
       L.fly.cx -= over;
     }
+
+    // --- pressure gauge: a round dial mounted on top of the boiler ---
+    var bo = L.boiler, cy2 = L.cylinder;
+    var gaugeR = Math.min(eh * 0.13, ew * 0.075, bo.w * 0.26);
+    gaugeR = Math.max(gaugeR, 22);
+    L.gauge = {
+      cx: bo.x + bo.w * 0.32,
+      cy: bo.y - gaugeR - 6,
+      r: gaugeR
+    };
+    if (L.gauge.cy - gaugeR < topPad - 2) {
+      L.gauge.cy = topPad - 2 + gaugeR;
+    }
+
+    // --- governor: two spinning balls above the cylinder/crank area ---
+    var govR = Math.min(eh * 0.12, ew * 0.07);
+    govR = Math.max(govR, 18);
+    L.gov = {
+      cx: cy2.x + cy2.w * 0.5,
+      cy: cy2.y - govR * 1.5 - 8,
+      r: govR,                       // arm length
+      ballR: Math.max(6, govR * 0.32)
+    };
+    if (L.gov.cy - govR * 1.7 < topPad - 2) {
+      L.gov.cy = topPad - 2 + govR * 1.7;
+    }
+
+    // --- steam whistle: a little brass whistle on the boiler top ---
+    L.whistle = {
+      x: bo.x + bo.w * 0.66,
+      y: bo.y + 2,
+      h: Math.max(14, eh * 0.10)
+    };
   }
 
   // ---- piston kinematics ----
@@ -366,6 +415,23 @@ color: red
         inBoiler: true
       });
     }
+    // a strong burst of steam from the whistle when it's blowing
+    if (whistlePuff > 0 && L.whistle) {
+      var burst = Math.round(2 + whistlePuff * 5);
+      for (var wb = 0; wb < burst; wb++) {
+        steamParticles.push({
+          x: L.whistle.x + rand(-3, 3),
+          y: L.whistle.y - rand(0, 4),
+          vx: rand(-26, 26),
+          vy: rand(-52, -96),
+          life: 1,
+          decay: rand(0.7, 1.2),
+          size: rand(7, 14),
+          inBoiler: false
+        });
+      }
+    }
+
     // steam puffs out of the cylinder exhaust when the piston pushes
     var pf = (Math.cos(crankAngle) + 1) / 2; // 0..1
     if (heat > 8 && pf > 0.7 && Math.random() < 0.4) {
@@ -621,6 +687,9 @@ color: red
     roundRect(winX, winY, winW, winH, 10);
     ctx.stroke();
 
+    // ----- STEAM WHISTLE on the boiler -----
+    drawWhistle();
+
     // ----- STEAM PIPE from boiler top to cylinder -----
     var pipeY = b.y + b.h * 0.12;
     var pipeStartX = b.x + b.w - 4;
@@ -843,14 +912,249 @@ color: red
     }
     ctx.restore();
 
+    // ----- GOVERNOR (spinning balls) -----
+    drawGovernor();
+
+    // ----- PRESSURE GAUGE -----
+    drawGauge();
+
     // ----- LABELS -----
     label("Fire", fire.x + fire.w / 2, fire.y + fire.h + 16);
-    label("Boiler", b.x + b.w / 2, b.y - 12);
     label("Steam", b.x + b.w * 0.5, L.waterTop - b.h * 0.22);
     label("Water", b.x + b.w * 0.5, L.waterTop + b.h * 0.2);
-    label("Piston", pistonX, cyl.y - 12);
     label("Rod", (rodStartX + pinX) / 2, (rodStartY + pinY) / 2 - 14);
     label("Flywheel", fly.cx, fly.cy + fly.r + 16);
+
+    // piston stroke label: tells the kid which way the piston is travelling.
+    // piston X velocity sign decides PUSH (steam-driven, moving right) vs
+    // RETURN (flywheel carries it back left).
+    var aheadX = pistonXForAngle(crankAngle + Math.sign(crankSpeed || 1) * 0.12);
+    var moving = aheadX - pistonX;
+    var strokeTxt;
+    if (Math.abs(crankSpeed) < 0.25) strokeTxt = "Piston";
+    else if (moving > 0) strokeTxt = "PUSH →";
+    else strokeTxt = "← RETURN";
+    label(strokeTxt, pistonX, cyl.y - 12);
+  }
+
+  // ---- pressure gauge ----
+  // A round dial whose needle climbs with boiler pressure. Green when low,
+  // amber in the middle, red in the danger zone — easy for a kid to read.
+  function drawGauge() {
+    var ga = L.gauge;
+    if (!ga) return;
+    var r = ga.r;
+
+    // mounting pipe down to the boiler
+    ctx.strokeStyle = "#6b3a2e";
+    ctx.lineWidth = Math.max(4, r * 0.22);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(ga.cx, ga.cy + r * 0.55);
+    ctx.lineTo(ga.cx, ga.cy + r + 10);
+    ctx.stroke();
+
+    // dial body
+    ctx.fillStyle = "rgba(0,0,0,0.4)";
+    ctx.beginPath();
+    ctx.arc(ga.cx + 2, ga.cy + 3, r, 0, Math.PI * 2);
+    ctx.fill();
+    var faceGrad = ctx.createRadialGradient(
+      ga.cx - r * 0.3, ga.cy - r * 0.3, r * 0.1, ga.cx, ga.cy, r);
+    faceGrad.addColorStop(0, "#fff6e6");
+    faceGrad.addColorStop(1, "#d8c3a0");
+    ctx.fillStyle = faceGrad;
+    ctx.beginPath();
+    ctx.arc(ga.cx, ga.cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, r * 0.1);
+    ctx.strokeStyle = "#5e3a22";
+    ctx.stroke();
+
+    // coloured arc: needle sweeps a 240-degree dial
+    var a0 = Math.PI * 0.75;          // start angle (lower-left)
+    var a1 = Math.PI * 2.25;          // end angle (lower-right)
+    var span = a1 - a0;
+    function arcSeg(f0, f1, color) {
+      ctx.beginPath();
+      ctx.arc(ga.cx, ga.cy, r * 0.74, a0 + span * f0, a0 + span * f1);
+      ctx.lineWidth = Math.max(3, r * 0.16);
+      ctx.strokeStyle = color;
+      ctx.stroke();
+    }
+    arcSeg(0, 0.55, "#3fae54");
+    arcSeg(0.55, 0.8, "#e8a72c");
+    arcSeg(0.8, 1, "#e0432a");
+
+    // tick marks
+    ctx.strokeStyle = "#5e3a22";
+    ctx.lineWidth = Math.max(1.5, r * 0.05);
+    for (var t = 0; t <= 8; t++) {
+      var ta = a0 + span * (t / 8);
+      ctx.beginPath();
+      ctx.moveTo(ga.cx + Math.cos(ta) * r * 0.56, ga.cy + Math.sin(ta) * r * 0.56);
+      ctx.lineTo(ga.cx + Math.cos(ta) * r * 0.66, ga.cy + Math.sin(ta) * r * 0.66);
+      ctx.stroke();
+    }
+
+    // needle
+    var pf = Math.max(0, Math.min(1, pressure / 100));
+    var na = a0 + span * pf;
+    ctx.save();
+    ctx.translate(ga.cx, ga.cy);
+    ctx.rotate(na);
+    ctx.fillStyle = "#c2261a";
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.12, -r * 0.05);
+    ctx.lineTo(r * 0.72, 0);
+    ctx.lineTo(-r * 0.12, r * 0.05);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    // hub
+    ctx.fillStyle = "#3a2418";
+    ctx.beginPath();
+    ctx.arc(ga.cx, ga.cy, r * 0.13, 0, Math.PI * 2);
+    ctx.fill();
+
+    // "PSI" caption inside the dial
+    ctx.fillStyle = "#5e3a22";
+    ctx.font = "700 " + Math.max(8, r * 0.26) + "px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PSI", ga.cx, ga.cy + r * 0.42);
+
+    label("Pressure", ga.cx, ga.cy - r - 11);
+  }
+
+  // ---- governor ----
+  // Two heavy balls spin on hinged arms. The faster the engine runs, the more
+  // they fly outward — a real steam-engine speed sensor.
+  function drawGovernor() {
+    var gv = L.gov;
+    if (!gv) return;
+
+    // how far out the balls swing: 0 (hanging down) .. 1 (flung wide)
+    var speedFrac = Math.max(0, Math.min(1, Math.abs(crankSpeed) / 7.2));
+    var swing = 0.12 + speedFrac * 0.78;      // fraction of full outward swing
+    var armLen = gv.r;
+    var ballR = gv.ballR;
+
+    // central spindle
+    var spindleTop = gv.cy - armLen * 0.55;
+    var spindleBot = gv.cy + armLen * 1.05;
+    ctx.strokeStyle = "#7a5a3a";
+    ctx.lineWidth = Math.max(3, armLen * 0.16);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(gv.cx, spindleTop);
+    ctx.lineTo(gv.cx, spindleBot);
+    ctx.stroke();
+    // collar that slides up the spindle as the balls rise
+    var collarY = spindleBot - swing * armLen * 0.7;
+    ctx.fillStyle = "#b89a6a";
+    roundRect(gv.cx - armLen * 0.2, collarY - armLen * 0.08,
+              armLen * 0.4, armLen * 0.16, armLen * 0.06);
+    ctx.fill();
+
+    // the two arms + balls. The 3-D spin is faked: each ball's apparent
+    // horizontal reach is scaled by cos(govAngle) so it looks like it orbits.
+    var pivotY = spindleTop + armLen * 0.18;
+    // swing angle from vertical
+    var swingAng = swing * (Math.PI * 0.46);
+    var spin = Math.cos(govAngle);            // -1..1 perspective factor
+    for (var s = 0; s < 2; s++) {
+      var side = s === 0 ? 1 : -1;
+      var reach = Math.sin(swingAng) * armLen * side * spin;
+      var drop = Math.cos(swingAng) * armLen;
+      var bx = gv.cx + reach;
+      var by = pivotY + drop;
+
+      // arm from pivot to ball
+      ctx.strokeStyle = "#9a7a4a";
+      ctx.lineWidth = Math.max(2.5, armLen * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(gv.cx, pivotY);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      // link from ball back down to the sliding collar
+      ctx.strokeStyle = "#7a5a3a";
+      ctx.lineWidth = Math.max(1.8, armLen * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(gv.cx, collarY);
+      ctx.stroke();
+
+      // the heavy ball — slightly bigger when it's the near one
+      var nearScale = 0.86 + 0.14 * ((spin * side) + 1) / 2;
+      var br = ballR * nearScale;
+      var bGrad = ctx.createRadialGradient(
+        bx - br * 0.35, by - br * 0.35, 1, bx, by, br);
+      bGrad.addColorStop(0, "#ffd24d");
+      bGrad.addColorStop(0.55, "#e8902c");
+      bGrad.addColorStop(1, "#8a4a18");
+      ctx.fillStyle = bGrad;
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#5e2e10";
+      ctx.stroke();
+    }
+
+    // pivot cap on top
+    ctx.fillStyle = "#3a2418";
+    ctx.beginPath();
+    ctx.arc(gv.cx, pivotY, Math.max(3, armLen * 0.1), 0, Math.PI * 2);
+    ctx.fill();
+
+    label("Governor", gv.cx, spindleTop - 11);
+  }
+
+  // ---- steam whistle ----
+  // A small brass whistle on the boiler. It glows and shudders while blowing.
+  function drawWhistle() {
+    var wh = L.whistle;
+    if (!wh) return;
+    var h = wh.h;
+    var wWidth = h * 0.42;
+    var shake = whistlePuff > 0 ? Math.sin(performance.now() * 0.08) * 1.6 : 0;
+    var x = wh.x + shake;
+
+    // base flange on the boiler
+    ctx.fillStyle = "#9a5a48";
+    roundRect(x - wWidth * 0.8, wh.y - 3, wWidth * 1.6, 6, 3);
+    ctx.fill();
+
+    // brass body
+    var brass = ctx.createLinearGradient(x - wWidth / 2, 0, x + wWidth / 2, 0);
+    brass.addColorStop(0, "#8a5a1c");
+    brass.addColorStop(0.5, "#ffd24d");
+    brass.addColorStop(1, "#8a5a1c");
+    ctx.fillStyle = brass;
+    roundRect(x - wWidth / 2, wh.y - h, wWidth, h, wWidth * 0.3);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = "#5e3a10";
+    ctx.stroke();
+    // bell cap
+    ctx.fillStyle = "#ffe6b8";
+    roundRect(x - wWidth * 0.62, wh.y - h - 4, wWidth * 1.24, 6, 3);
+    ctx.fill();
+
+    // hot glow while whistling
+    if (whistlePuff > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      var gl = ctx.createRadialGradient(x, wh.y - h, 1, x, wh.y - h, h);
+      gl.addColorStop(0, "rgba(255,240,200," + (0.5 * whistlePuff) + ")");
+      gl.addColorStop(1, "rgba(255,240,200,0)");
+      ctx.fillStyle = gl;
+      ctx.beginPath();
+      ctx.arc(x, wh.y - h, h, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   // ---- main loop ----
@@ -859,12 +1163,27 @@ color: red
     var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
     lastT = t;
 
+    // boiler pressure eases toward the heat level — it builds and bleeds slowly
+    pressure += (heat - pressure) * Math.min(1, dt * 0.9);
+    if (pressure < 0) pressure = 0;
+    if (pressure > 100) pressure = 100;
+
     // heat sets a target flywheel speed; speed eases toward it (inertia)
     var targetSpeed = (heat / 100) * 7.2;        // rad/sec at full heat
     crankSpeed += (targetSpeed - crankSpeed) * Math.min(1, dt * 1.4);
     if (heat <= 0 && Math.abs(crankSpeed) < 0.03) crankSpeed = 0;
     crankAngle += crankSpeed * dt;
     if (crankAngle > Math.PI * 2) crankAngle -= Math.PI * 2;
+
+    // the governor is belt-driven by the flywheel — it spins a bit faster
+    govAngle += crankSpeed * 1.5 * dt;
+    if (govAngle > Math.PI * 2) govAngle -= Math.PI * 2;
+
+    // the whistle's steam burst fades quickly after a tap
+    if (whistlePuff > 0) {
+      whistlePuff -= dt * 1.6;
+      if (whistlePuff < 0) whistlePuff = 0;
+    }
 
     spawnFire();
     spawnSteam();
@@ -881,6 +1200,90 @@ color: red
   }
   heatSlider.addEventListener("input", onHeat);
   heatSlider.addEventListener("change", onHeat);
+
+  // ---- steam whistle (Web Audio) ----
+  // The AudioContext is created lazily on the FIRST user tap, so it always
+  // starts from a real gesture and never throws an autoplay warning.
+  var audioCtx = null;
+  var whistleBusy = false;
+
+  function blowWhistle() {
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === "suspended" && audioCtx.resume) {
+        audioCtx.resume();
+      }
+      if (whistleBusy) return;          // don't stack overlapping whistles
+      whistleBusy = true;
+
+      var now = audioCtx.currentTime;
+      var dur = 0.85;
+      // louder, brighter whistle when the boiler has more pressure
+      var pf = Math.max(0, Math.min(1, pressure / 100));
+      var vol = 0.12 + pf * 0.18;
+      var baseFreq = 620 + pf * 260;
+
+      var master = audioCtx.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(vol, now + 0.06);
+      master.gain.setValueAtTime(vol, now + dur - 0.25);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+      master.connect(audioCtx.destination);
+
+      // two slightly detuned tones give that breathy steam-whistle chord
+      var offsets = [1, 1.5];
+      for (var i = 0; i < offsets.length; i++) {
+        var osc = audioCtx.createOscillator();
+        osc.type = "sine";
+        var f = baseFreq * offsets[i];
+        osc.frequency.setValueAtTime(f * 0.92, now);
+        osc.frequency.linearRampToValueAtTime(f, now + 0.12);
+        osc.frequency.setValueAtTime(f, now + dur - 0.2);
+        osc.frequency.linearRampToValueAtTime(f * 0.9, now + dur);
+        var g = audioCtx.createGain();
+        g.gain.value = i === 0 ? 1 : 0.5;
+        osc.connect(g);
+        g.connect(master);
+        osc.start(now);
+        osc.stop(now + dur + 0.05);
+      }
+
+      // a hiss of breathy noise on top
+      var noiseLen = Math.floor(audioCtx.sampleRate * dur);
+      var buf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
+      var data = buf.getChannelData(0);
+      for (var n = 0; n < noiseLen; n++) data[n] = (Math.random() * 2 - 1);
+      var noise = audioCtx.createBufferSource();
+      noise.buffer = buf;
+      var nFilter = audioCtx.createBiquadFilter();
+      nFilter.type = "bandpass";
+      nFilter.frequency.value = baseFreq * 2;
+      nFilter.Q.value = 1.2;
+      var nGain = audioCtx.createGain();
+      nGain.gain.value = 0.18;
+      noise.connect(nFilter);
+      nFilter.connect(nGain);
+      nGain.connect(master);
+      noise.start(now);
+      noise.stop(now + dur + 0.05);
+
+      whistlePuff = 1; // trigger the visual steam burst
+      setTimeout(function () { whistleBusy = false; }, (dur + 0.1) * 1000);
+    } catch (err) {
+      whistleBusy = false;
+    }
+  }
+
+  // visual: a quick extra burst of steam from the whistle when it blows
+  var whistlePuff = 0;
+
+  // tapping the engine (the canvas) blows the whistle
+  canvas.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    blowWhistle();
+  });
 
   var howBtn = document.getElementById("how");
   var howPanel = document.getElementById("howPanel");

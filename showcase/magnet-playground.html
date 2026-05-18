@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Magnet Playground
-description: Drag a bar magnet and watch its field lines bend — push another magnet around, spin a compass, and sprinkle iron filings that snap into the field.
+description: Drag a bar magnet and an electromagnet coil, watch their field lines bend, and slide the current to power the coil up, down, or flip its poles — with a compass and iron filings that snap into the field.
 emoji: 🧲
 color: blue
 -->
@@ -92,12 +92,14 @@ color: blue
   #help {
     position: fixed;
     left: clamp(10px, 2.4vw, 18px);
+    right: clamp(10px, 2.4vw, 18px);
     top: 64px;
     z-index: 6;
-    max-width: min(340px, 88vw);
+    pointer-events: none;
   }
   #helpPanel {
-    margin-top: 8px;
+    pointer-events: auto;
+    max-width: min(340px, 88vw);
     background: var(--panel);
     border: 1px solid rgba(95, 184, 255, 0.3);
     border-radius: 14px;
@@ -116,11 +118,100 @@ color: blue
     position: fixed;
     left: 0; right: 0; bottom: 0;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     padding: clamp(10px, 2.4vw, 18px);
     pointer-events: none;
     z-index: 5;
   }
+  #coilPanel {
+    pointer-events: auto;
+    background: var(--panel);
+    border: 1px solid rgba(95, 184, 255, 0.26);
+    border-radius: 16px;
+    padding: 10px 16px 12px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    width: min(520px, 94vw);
+  }
+  .crow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .crow .lbl {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: clamp(13px, 3.5vw, 15px);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 86px;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1 1 auto;
+    height: 44px;
+    background: transparent;
+    cursor: pointer;
+    margin: 0;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 12px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #2f7be0, #1a2740, #e8453c);
+  }
+  input[type=range]::-moz-range-track {
+    height: 12px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #2f7be0, #1a2740, #e8453c);
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px;
+    height: 30px;
+    margin-top: -9px;
+    border-radius: 50%;
+    background: #fff;
+    border: 4px solid #5fb8ff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: #fff;
+    border: 4px solid #5fb8ff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  }
+  #coilReadout {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(12px, 3.3vw, 14px);
+    color: var(--muted);
+  }
+  #coilReadout .strack {
+    flex: 1 1 auto;
+    height: 12px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.12);
+    overflow: hidden;
+    position: relative;
+  }
+  #coilReadout .sfill {
+    position: absolute;
+    left: 50%; top: 0; bottom: 0;
+    border-radius: 6px;
+    background: linear-gradient(90deg, #7affd6, #ffd166);
+    width: 0%;
+    transition: width .1s ease, left .1s ease, background .15s ease;
+  }
+  #coilVal { font-weight: 700; color: var(--accent2); font-variant-numeric: tabular-nums; min-width: 84px; text-align: right; }
   #hint {
     background: var(--panel);
     border: 1px solid rgba(95, 184, 255, 0.22);
@@ -148,21 +239,33 @@ color: blue
   <div class="controls">
     <button id="filingsBtn" type="button" class="on">✨ Filings: On</button>
     <button id="resetBtn" type="button">↺ Reset</button>
+    <button id="helpBtn" type="button">❓ How it works</button>
   </div>
 </div>
 
 <div id="help">
-  <button id="helpBtn" type="button">❓ How it works</button>
   <div id="helpPanel">
     <p>🧲 Drag a magnet around. The glowing lines show its invisible magnetic field.</p>
     <p>🔴 Red is the North pole, 🔵 blue is South. Opposite poles pull together, the same poles push apart.</p>
     <p>🧭 The compass needle always turns to point along the field.</p>
     <p>✨ The tiny iron filings line up with the field, just like real ones do!</p>
+    <p>🔌 The <b>coil</b> is an electromagnet. Slide the <b>current</b> up to make it stronger, slide it the other way to <b>flip its poles</b>, or set it to zero to turn the magnetism off!</p>
   </div>
 </div>
 
 <div id="info">
-  <div id="hint">Drag a magnet · push the magnets together to feel them pull or push</div>
+  <div id="coilPanel">
+    <div class="crow">
+      <div class="lbl">🔌 Current</div>
+      <input id="currentSlider" type="range" min="-100" max="100" value="60" aria-label="Electromagnet current">
+    </div>
+    <div id="coilReadout">
+      <span>field</span>
+      <div class="strack"><div id="fieldFill" class="sfill"></div></div>
+      <span id="coilVal">N: medium</span>
+    </div>
+  </div>
+  <div id="hint">Drag the magnets · slide the current to power the coil</div>
 </div>
 
 <script>
@@ -178,6 +281,9 @@ color: blue
   var resetBtn = document.getElementById("resetBtn");
   var helpBtn = document.getElementById("helpBtn");
   var helpPanel = document.getElementById("helpPanel");
+  var currentSlider = document.getElementById("currentSlider");
+  var fieldFill = document.getElementById("fieldFill");
+  var coilVal = document.getElementById("coilVal");
 
   var W = 0, H = 0, DPR = 1;
   var showFilings = true;
@@ -195,11 +301,47 @@ color: blue
       length: 150,
       width: 52,
       strength: 9000,      // pole strength
-      held: false
+      held: false,
+      isCoil: false        // bar magnets are not coils
     };
   }
 
+  // An electromagnet coil. Same field model as a bar magnet (two poles),
+  // but its pole strength is set by the current slider. The current can be
+  // negative, which flips which end is North — or zero, which turns it off.
+  // maxStrength is the pole strength at full current.
+  function makeCoil(x, y, angle) {
+    return {
+      x: x, y: y,
+      angle: angle,
+      vx: 0, vy: 0,
+      vAngle: 0,
+      length: 150,
+      width: 52,
+      current: 60,         // -100 .. 100, from the slider
+      maxStrength: 11000,  // pole strength at |current| = 100
+      held: false,
+      isCoil: true
+    };
+  }
+
+  // signed pole strength of any magnet (bar magnets are constant)
+  function poleStrength(m) {
+    if (m.isCoil) return (m.current / 100) * m.maxStrength;
+    return m.strength;
+  }
+
+  // The real magnetic North pole is the geometric +end when strength is
+  // positive, and the -end when a coil's current is reversed.
+  function northPoleOf(m) {
+    return poleOf(m, poleStrength(m) >= 0 ? 1 : -1);
+  }
+  function southPoleOf(m) {
+    return poleOf(m, poleStrength(m) >= 0 ? -1 : 1);
+  }
+
   var magnets = [];
+  var coil = null;
   var compass = { x: 0, y: 0, angle: 0 };
   var filings = [];
 
@@ -208,7 +350,7 @@ color: blue
   }
 
   function poleOf(m, sign) {
-    // sign +1 => North end, -1 => South end
+    // sign +1 => North end, -1 => South end (geometric end of the bar)
     var half = (m.length * 0.5) - m.width * 0.18;
     return {
       x: m.x + Math.cos(m.angle) * half * sign,
@@ -219,27 +361,30 @@ color: blue
   function setupWorld() {
     var sc = magnetScale();
     var mLen = 160 * sc;
-    var m1, m2;
-    // if two magnets won't fit comfortably side-by-side, stack them
-    // vertically so they start clearly separated instead of snapping together.
-    // side-by-side needs the 0.3*W centre gap to exceed a magnet length + clearance.
+    var wid = 56 * sc;
+    var m1, c1;
+    // narrow / tall screens: stack the two magnets vertically so they
+    // start clearly separated instead of snapping together.
     if (0.3 * W < mLen + 90) {
-      m1 = makeMagnet(W * 0.62, H * 0.46, 0);
-      m2 = makeMagnet(W * 0.62, H * 0.70, 0);
-      compass.x = W * 0.28;
-      compass.y = H * 0.30;
+      m1 = makeMagnet(W * 0.62, H * 0.40, 0);
+      c1 = makeCoil(W * 0.62, H * 0.66, 0);
+      compass.x = W * 0.27;
+      compass.y = H * 0.28;
     } else {
-      m1 = makeMagnet(W * 0.36, H * 0.5, 0);
-      m2 = makeMagnet(W * 0.66, H * 0.5, 0);
+      m1 = makeMagnet(W * 0.34, H * 0.48, 0);
+      c1 = makeCoil(W * 0.68, H * 0.48, 0);
       compass.x = W * 0.5;
-      compass.y = H * 0.26;
+      compass.y = H * 0.24;
     }
-    m1.length = mLen; m1.width = 56 * sc;
-    m2.length = mLen; m2.width = 56 * sc;
-    magnets = [m1, m2];
+    m1.length = mLen; m1.width = wid;
+    c1.length = mLen; c1.width = wid;
+    c1.current = parseFloat(currentSlider.value) || 0;
+    coil = c1;
+    magnets = [m1, c1];
 
     compass.angle = 0;
     buildFilings();
+    updateCoilReadout();
   }
 
   function buildFilings() {
@@ -279,8 +424,9 @@ color: blue
       if (m === ignoreMagnet) continue;
       var n = poleOf(m, 1);
       var s = poleOf(m, -1);
-      var fn = poleField(n.x, n.y, x, y, m.strength);
-      var fs = poleField(s.x, s.y, x, y, -m.strength);
+      var q = poleStrength(m);
+      var fn = poleField(n.x, n.y, x, y, q);
+      var fs = poleField(s.x, s.y, x, y, -q);
       fx += fn.x + fs.x;
       fy += fn.y + fs.y;
     }
@@ -410,11 +556,53 @@ color: blue
     filingsBtn.classList.toggle("on", showFilings);
   });
   resetBtn.addEventListener("click", function () {
+    currentSlider.value = "60";
     setupWorld();
   });
   helpBtn.addEventListener("click", function () {
+    // anchor the panel just below the HUD — the HUD wraps to a taller
+    // height on narrow screens, so measure it instead of assuming one row.
+    var hud = document.getElementById("hud");
+    var helpWrap = document.getElementById("help");
+    if (hud && helpWrap) {
+      helpWrap.style.top = Math.round(hud.getBoundingClientRect().bottom + 8) + "px";
+    }
     helpPanel.classList.toggle("open");
   });
+
+  // current slider drives the electromagnet's strength (and pole direction)
+  currentSlider.addEventListener("input", function () {
+    if (coil) coil.current = parseFloat(currentSlider.value) || 0;
+    updateCoilReadout();
+  });
+
+  // update the field-strength bar + word label under the slider
+  function updateCoilReadout() {
+    if (!coil) return;
+    var cur = coil.current;
+    var mag = Math.abs(cur) / 100; // 0..1
+    // bar grows out from the centre toward the side of the current
+    var halfPct = mag * 50;
+    if (cur >= 0) {
+      fieldFill.style.left = "50%";
+      fieldFill.style.width = halfPct + "%";
+      fieldFill.style.background = "linear-gradient(90deg, #ffd166, #e8453c)";
+    } else {
+      fieldFill.style.left = (50 - halfPct) + "%";
+      fieldFill.style.width = halfPct + "%";
+      fieldFill.style.background = "linear-gradient(90deg, #2f7be0, #7affd6)";
+    }
+    var word;
+    if (mag < 0.03) word = "off";
+    else if (mag < 0.4) word = "weak";
+    else if (mag < 0.75) word = "medium";
+    else word = "strong";
+    if (mag < 0.03) {
+      coilVal.textContent = "off";
+    } else {
+      coilVal.textContent = (cur >= 0 ? "N ▶ " : "◀ S ") + word;
+    }
+  }
 
   // ---- physics: magnet-magnet interaction ----
   // Magnet 2 (and any non-held magnet) gets pushed by forces between poles.
@@ -425,9 +613,10 @@ color: blue
 
       // compute force & torque from every OTHER magnet's poles on m's poles
       var fx = 0, fy = 0, torque = 0;
+      var mq = poleStrength(m);
       var mPoles = [
-        { p: poleOf(m, 1), q: m.strength },
-        { p: poleOf(m, -1), q: -m.strength }
+        { p: poleOf(m, 1), q: mq },
+        { p: poleOf(m, -1), q: -mq }
       ];
       for (var a = 0; a < mPoles.length; a++) {
         var mp = mPoles[a];
@@ -531,11 +720,13 @@ color: blue
       y += ny;
       pts.push(x, y);
       if (x < -60 || x > W + 60 || y < -60 || y > H + 60) break;
-      // stop if we got very close to any S pole
+      // stop if we got very close to any magnet's South pole (the end the
+      // field flows into). For a coil, negative current swaps which end
+      // that is, so use the signed strength to find the real South end.
       var done = false;
       for (var j = 0; j < magnets.length; j++) {
-        var s = poleOf(magnets[j], -1);
-        var dx = x - s.x, dy = y - s.y;
+        var southEnd = southPoleOf(magnets[j]);
+        var dx = x - southEnd.x, dy = y - southEnd.y;
         if (dx * dx + dy * dy < 16 * 16) { done = true; break; }
       }
       if (done) break;
@@ -547,7 +738,9 @@ color: blue
   function drawFieldLines() {
     for (var i = 0; i < magnets.length; i++) {
       var m = magnets[i];
-      var n = poleOf(m, 1);
+      // a coil with no current has no field — nothing to draw from it
+      if (Math.abs(poleStrength(m)) < 1) continue;
+      var n = northPoleOf(m);
       var ringCount = 9;
       var ringR = m.width * 0.42;
       for (var r = 0; r < ringCount; r++) {
@@ -619,6 +812,7 @@ color: blue
   }
 
   function drawMagnet(m) {
+    if (m.isCoil) { drawCoil(m); return; }
     ctx.save();
     ctx.translate(m.x, m.y);
     ctx.rotate(m.angle);
@@ -657,6 +851,99 @@ color: blue
     // letters should stay upright-ish: counter-rotate text
     drawUprightLetter("N", L / 4, 0, m.angle, fs);
     drawUprightLetter("S", -L / 4, 0, m.angle, fs);
+
+    ctx.restore();
+  }
+
+  // Draw the electromagnet: an iron bar wrapped in copper wire coils,
+  // with end caps that light up red/blue depending on the current sign.
+  function drawCoil(m) {
+    var q = poleStrength(m);
+    var on = Math.abs(q) >= 1;
+    var posCurrent = m.current >= 0;
+    ctx.save();
+    ctx.translate(m.x, m.y);
+    ctx.rotate(m.angle);
+    var L = m.length, Wd = m.width;
+    var r = Math.min(14, Wd * 0.3);
+
+    // shadow under the whole coil
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+
+    // iron core bar (grey)
+    ctx.fillStyle = "#9aa6b8";
+    roundRectPath(-L / 2, -Wd * 0.34, L, Wd * 0.68, r * 0.7);
+    ctx.fill();
+
+    ctx.shadowColor = "transparent";
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // end caps coloured by the REAL poles (swap when current is reversed)
+    var northRight = q >= 0; // geometric +end is North when q positive
+    var capW = L * 0.16;
+    ctx.fillStyle = on ? (northRight ? "#e8453c" : "#2f7be0") : "#5a6373";
+    roundRectPath(L / 2 - capW, -Wd * 0.40, capW, Wd * 0.80, r * 0.6);
+    ctx.fill();
+    ctx.fillStyle = on ? (northRight ? "#2f7be0" : "#e8453c") : "#5a6373";
+    roundRectPath(-L / 2, -Wd * 0.40, capW, Wd * 0.80, r * 0.6);
+    ctx.fill();
+
+    // copper wire coils wrapped around the core
+    var loops = 9;
+    var coilStart = -L / 2 + capW + 6;
+    var coilEnd = L / 2 - capW - 6;
+    var coilSpan = coilEnd - coilStart;
+    var loopGap = coilSpan / loops;
+    var coilColor = on ? "#ff9d4d" : "#b8763c";
+    ctx.lineWidth = Math.max(3, Wd * 0.12);
+    ctx.lineCap = "round";
+    for (var i = 0; i < loops; i++) {
+      var lx = coilStart + (i + 0.5) * loopGap;
+      ctx.strokeStyle = coilColor;
+      ctx.beginPath();
+      // a slanted oval gives a wrapped-wire look
+      ctx.moveTo(lx - loopGap * 0.34, -Wd * 0.46);
+      ctx.bezierCurveTo(
+        lx + loopGap * 0.5, -Wd * 0.20,
+        lx + loopGap * 0.5, Wd * 0.20,
+        lx - loopGap * 0.34, Wd * 0.46
+      );
+      ctx.stroke();
+      // thin highlight on each loop
+      ctx.strokeStyle = "rgba(255,255,255,0.30)";
+      ctx.lineWidth = Math.max(1, Wd * 0.04);
+      ctx.beginPath();
+      ctx.moveTo(lx - loopGap * 0.34, -Wd * 0.46);
+      ctx.bezierCurveTo(
+        lx + loopGap * 0.5, -Wd * 0.20,
+        lx + loopGap * 0.5, Wd * 0.20,
+        lx - loopGap * 0.34, Wd * 0.46
+      );
+      ctx.stroke();
+      ctx.lineWidth = Math.max(3, Wd * 0.12);
+    }
+
+    // pole letters on the caps (real poles)
+    var fs = Math.round(Wd * 0.42);
+    if (on) {
+      drawUprightLetter(northRight ? "N" : "S", L / 2 - capW / 2, 0, m.angle, fs);
+      drawUprightLetter(northRight ? "S" : "N", -L / 2 + capW / 2, 0, m.angle, fs);
+    }
+
+    // little "off" label when no current flows
+    if (!on) {
+      ctx.save();
+      ctx.rotate(-m.angle);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.font = "700 " + Math.round(Wd * 0.30) + "px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("off", 0, 0);
+      ctx.restore();
+    }
 
     ctx.restore();
   }
@@ -760,13 +1047,19 @@ color: blue
     if (showFilings) drawFilings();
     drawFieldLines();
 
-    // pole glows
+    // pole glows — scale with strength so a weak coil glows faintly,
+    // and the real (current-dependent) poles light up red/blue.
     for (var i = 0; i < magnets.length; i++) {
       var m = magnets[i];
-      var n = poleOf(m, 1);
-      var sp = poleOf(m, -1);
-      glow(n.x, n.y, m.width * 0.95, "rgba(255,90,80,0.5)");
-      glow(sp.x, sp.y, m.width * 0.95, "rgba(80,150,255,0.5)");
+      var q = poleStrength(m);
+      if (Math.abs(q) < 1) continue;
+      var strengthFrac = Math.min(1, Math.abs(q) / 11000);
+      var n = northPoleOf(m);
+      var sp = southPoleOf(m);
+      var ga = (0.18 + 0.40 * strengthFrac).toFixed(3);
+      var gr = m.width * (0.55 + 0.45 * strengthFrac);
+      glow(n.x, n.y, gr, "rgba(255,90,80," + ga + ")");
+      glow(sp.x, sp.y, gr, "rgba(80,150,255," + ga + ")");
     }
 
     for (var k = 0; k < magnets.length; k++) {

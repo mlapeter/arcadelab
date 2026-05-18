@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Gear Train
-description: A hands-on machine of meshing gears — drag any gear to spin the whole train and watch how small gears whirl fast while big gears turn slow.
+description: A hands-on machine of meshing gears — turn the hand crank or drag any gear, change the small gear's size, and watch live RPM numbers as small gears whirl fast while big gears turn slow.
 emoji: ⚙️
 color: orange
 -->
@@ -82,6 +82,12 @@ color: orange
   }
   button:hover { background: rgba(74, 50, 18, 0.95); border-color: var(--accent); }
   button:active { transform: scale(0.94); }
+  button:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+  }
+  button:disabled:hover { background: var(--panel); border-color: rgba(255, 178, 77, 0.36); }
   #info {
     position: fixed;
     left: 0; right: 0; bottom: 0;
@@ -152,6 +158,8 @@ color: orange
   <div class="title"><span class="em">⚙️</span><span>Gear Train</span></div>
   <div class="spacer"></div>
   <div class="controls">
+    <button id="smaller" type="button" aria-label="Make the small gear smaller">➖ teeth</button>
+    <button id="bigger" type="button" aria-label="Make the small gear bigger">➕ teeth</button>
     <button id="how" type="button">How it works</button>
     <button id="reset" type="button">Reset</button>
   </div>
@@ -162,6 +170,8 @@ color: orange
   <p>Gears with teeth lock together and push each other around.</p>
   <p>Touching gears always spin in opposite directions.</p>
   <p>A small gear has fewer teeth, so it must spin many more times to keep up with a big gear. That is a gear ratio!</p>
+  <p>Turn the red hand crank, or drag any gear, to spin the whole train.</p>
+  <p>Use ➖ and ➕ to change the small gear's teeth — watch the RPM numbers and the ratio change!</p>
 </div>
 
 <div id="info">
@@ -183,6 +193,9 @@ color: orange
   var W = 0, H = 0, DPR = 1;
   var gears = [];
 
+  // hand crank attached to the big gear (gears[0]). It rotates with that gear.
+  var crank = { armLen: 0, gripR: 0 };
+
   // momentum of the train (radians/sec of the reference driver gear)
   var driverSpeed = 0;   // current angular speed applied to gears[0]
   var TOOTH_MODULE = 0;  // pixels per tooth-pitch unit, computed on layout
@@ -200,16 +213,21 @@ color: orange
       angle: 0,
       dir: 1,            // spin direction relative to driver (+1 / -1)
       speedMul: 1,       // angular-speed multiplier vs driver
+      rpm: 0,            // live revolutions-per-minute (for display)
       color: color,
       label: label
     };
   }
 
+  // teeth count of the adjustable small gear
+  var SMALL_MIN = 6, SMALL_MAX = 16, SMALL_DEFAULT = 10;
+  var smallTeeth = SMALL_DEFAULT;
+
   function buildTrain() {
     gears = [
       makeGear(30, "#ff8c3c", "BIG"),
       makeGear(18, "#ffd24d", "MID"),
-      makeGear(10, "#7fd0ff", "SMALL")
+      makeGear(smallTeeth, "#7fd0ff", "SMALL")
     ];
   }
 
@@ -224,14 +242,15 @@ color: orange
     var spanCoef = (TIP * big.teeth + (big.teeth + mid.teeth) +
                     (mid.teeth + small.teeth) + TIP * small.teeth) / 2;
     var maxModule = avail / spanCoef;
-    var heightModule = (H * 0.58) / (big.teeth * TIP + 4);
+    // leave vertical room below the gears for the two label rows (teeth + RPM)
+    var heightModule = (H * 0.50) / (big.teeth * TIP + 4);
     TOOTH_MODULE = Math.max(2.2, Math.min(maxModule, heightModule));
 
     for (var i = 0; i < gears.length; i++) {
       gears[i].pitchR = gears[i].teeth * TOOTH_MODULE / 2;
     }
 
-    var cy = H * 0.52;
+    var cy = H * 0.46;
     // Distance between meshing gear centers = sum of their pitch radii.
     var d1 = big.pitchR + mid.pitchR;
     var d2 = mid.pitchR + small.pitchR;
@@ -259,6 +278,10 @@ color: orange
     big.dir = 1; big.speedMul = 1;
     mid.dir = -1; mid.speedMul = big.teeth / mid.teeth;
     small.dir = 1; small.speedMul = big.teeth / small.teeth;
+
+    // hand crank: a handle that orbits the big gear's hub
+    crank.armLen = big.pitchR * 0.62;          // distance from hub to grip
+    crank.gripR = Math.max(14, big.pitchR * 0.16); // grip knob radius (tap target)
   }
 
   // ---- physics / spin ----
@@ -332,11 +355,28 @@ color: orange
     return null;
   }
 
+  // current position of the hand-crank grip knob (orbits the big gear's hub)
+  function crankGripPos() {
+    var big = gears[0];
+    return {
+      x: big.cx + Math.cos(big.angle) * crank.armLen,
+      y: big.cy + Math.sin(big.angle) * crank.armLen
+    };
+  }
+
+  function onCrankGrip(x, y) {
+    var gp = crankGripPos();
+    var dx = x - gp.x, dy = y - gp.y;
+    var hit = crank.gripR + 14; // generous tap target
+    return dx * dx + dy * dy <= hit * hit;
+  }
+
   canvas.addEventListener("pointerdown", function (e) {
     e.preventDefault();
     if (dragging) return;
     var pt = pointFromEvent(e);
-    var g = gearAt(pt.x, pt.y);
+    // the crank grip takes priority — it's the easiest thing to grab
+    var g = onCrankGrip(pt.x, pt.y) ? gears[0] : gearAt(pt.x, pt.y);
     if (!g) return;
     dragging = g;
     dragPointerId = e.pointerId;
@@ -511,11 +551,41 @@ color: orange
     ctx.restore();
 
     // tooth-count label under the gear
-    ctx.fillStyle = "#fff3e0";
-    ctx.font = "700 " + Math.max(12, Math.min(20, pr * 0.32)) + "px system-ui, sans-serif";
+    var labelY = g.cy + outerR + 8;
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    ctx.fillText(g.teeth + " teeth", g.cx, g.cy + outerR + 8);
+    ctx.fillStyle = "#fff3e0";
+    ctx.font = "700 " + Math.max(12, Math.min(20, pr * 0.32)) + "px system-ui, sans-serif";
+    ctx.fillText(g.teeth + " teeth", g.cx, labelY);
+
+    // live RPM readout in a little pill below the tooth count
+    var rpmTxt = Math.round(Math.abs(g.rpm)) + " RPM";
+    var rpmFont = Math.max(12, Math.min(19, pr * 0.30));
+    ctx.font = "700 " + rpmFont + "px system-ui, sans-serif";
+    var rpmW = ctx.measureText(rpmTxt).width;
+    var pillY = labelY + rpmFont + 9;
+    var padX = 9, padH = rpmFont + 9;
+    ctx.fillStyle = "rgba(26,18,6,0.9)";
+    roundRectGT(g.cx - rpmW / 2 - padX, pillY - padH / 2, rpmW + padX * 2, padH, padH / 2);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = markerColor(g);
+    ctx.stroke();
+    ctx.fillStyle = "#ffe6b8";
+    ctx.textBaseline = "middle";
+    ctx.fillText(rpmTxt, g.cx, pillY + 1);
+  }
+
+  // rounded-rect path helper (used for the RPM pills)
+  function roundRectGT(x, y, w, h, r) {
+    var rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
   }
 
   function markerColor(g) {
@@ -606,6 +676,72 @@ color: orange
     for (var d = 0; d < gears.length; d++) {
       drawGear(gears[d]);
     }
+
+    // hand crank sits on top of the big gear
+    drawCrank();
+  }
+
+  // ---- hand crank ----
+  // A bright handle bolted to the big gear's hub. Kids grab the round grip and
+  // turn it like a real crank — it drives the whole train.
+  function drawCrank() {
+    var big = gears[0];
+    var gp = crankGripPos();
+
+    // shadow
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(7, crank.gripR * 0.7);
+    ctx.strokeStyle = "rgba(0,0,0,0.4)";
+    ctx.beginPath();
+    ctx.moveTo(big.cx + 2, big.cy + 4);
+    ctx.lineTo(gp.x + 2, gp.y + 4);
+    ctx.stroke();
+
+    // crank arm
+    var armGrad = ctx.createLinearGradient(big.cx, big.cy, gp.x, gp.y);
+    armGrad.addColorStop(0, "#ff7a3c");
+    armGrad.addColorStop(1, "#d8431f");
+    ctx.strokeStyle = armGrad;
+    ctx.lineWidth = Math.max(6, crank.gripR * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(big.cx, big.cy);
+    ctx.lineTo(gp.x, gp.y);
+    ctx.stroke();
+
+    // hub bolt where the arm meets the gear center
+    ctx.fillStyle = "#3a2510";
+    ctx.beginPath();
+    ctx.arc(big.cx, big.cy, Math.max(5, crank.gripR * 0.35), 0, Math.PI * 2);
+    ctx.fill();
+
+    // round grip knob the kid grabs
+    var knob = ctx.createRadialGradient(
+      gp.x - crank.gripR * 0.35, gp.y - crank.gripR * 0.35, 1,
+      gp.x, gp.y, crank.gripR);
+    knob.addColorStop(0, "#ffe6b8");
+    knob.addColorStop(0.55, "#ff9a4c");
+    knob.addColorStop(1, "#c2391a");
+    ctx.fillStyle = knob;
+    ctx.beginPath();
+    ctx.arc(gp.x, gp.y, crank.gripR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#7c2410";
+    ctx.stroke();
+
+    // a soft pulsing ring on the grip when nothing is moving — invites a turn
+    var resting = !dragging && Math.abs(driverSpeed) < 0.04 &&
+                  Math.abs(gears[0].rpm) < 1;
+    if (resting) {
+      var pulse = (Math.sin(performance.now() * 0.005) + 1) / 2;
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "rgba(255,230,184," + (0.25 + 0.45 * pulse) + ")";
+      ctx.beginPath();
+      ctx.arc(gp.x, gp.y, crank.gripR + 5 + pulse * 5, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // ---- ratio display ----
@@ -614,6 +750,25 @@ color: orange
     var ratio = big.teeth / small.teeth;
     var rounded = Math.round(ratio * 10) / 10;
     ratioEl.innerHTML = "<b>1 : " + rounded + "</b> — the small gear spins " + rounded + "× faster";
+  }
+
+  // ---- RPM tracking ----
+  // We measure how fast the driver angle is actually changing each frame so the
+  // numbers are honest whether the kid is dragging, cranking, or coasting.
+  var prevDriverAngle = 0;
+  function updateRPM(dt) {
+    if (dt <= 0) return;
+    var delta = driverAngle - prevDriverAngle;
+    prevDriverAngle = driverAngle;
+    var driverRPM = (delta / dt) / (Math.PI * 2) * 60;
+    for (var i = 0; i < gears.length; i++) {
+      var g = gears[i];
+      // each gear's speed = driver speed * its multiplier
+      var instRPM = driverRPM * g.speedMul;
+      // smooth so the readout doesn't flicker
+      g.rpm = g.rpm * 0.78 + instRPM * 0.22;
+      if (Math.abs(g.rpm) < 0.5) g.rpm = 0;
+    }
   }
 
   // ---- main loop ----
@@ -630,21 +785,59 @@ color: orange
       applyTrain(driverAngle);
     }
 
+    updateRPM(dt);
     draw();
     requestAnimationFrame(frame);
   }
 
   // ---- buttons ----
+  // Rebuild the train keeping the current spin so size changes feel smooth.
+  function rebuildKeepingSpin() {
+    var keptSpeed = driverSpeed;
+    var keptAngle = driverAngle;
+    buildTrain();
+    layout();
+    computePhases();
+    driverAngle = keptAngle;
+    driverSpeed = keptSpeed;
+    prevDriverAngle = keptAngle;
+    applyTrain(driverAngle);
+    updateRatio();
+    updateSizeButtons();
+  }
+
+  function updateSizeButtons() {
+    smallerBtn.disabled = smallTeeth <= SMALL_MIN;
+    biggerBtn.disabled = smallTeeth >= SMALL_MAX;
+  }
+
+  var smallerBtn = document.getElementById("smaller");
+  var biggerBtn = document.getElementById("bigger");
+
+  smallerBtn.addEventListener("click", function () {
+    if (smallTeeth <= SMALL_MIN) return;
+    smallTeeth -= 2;
+    rebuildKeepingSpin();
+  });
+  biggerBtn.addEventListener("click", function () {
+    if (smallTeeth >= SMALL_MAX) return;
+    smallTeeth += 2;
+    rebuildKeepingSpin();
+  });
+
   document.getElementById("reset").addEventListener("click", function () {
     driverAngle = 0;
     driverSpeed = 0;
+    prevDriverAngle = 0;
     dragging = null;
     dragPointerId = null;
+    smallTeeth = SMALL_DEFAULT;
     buildTrain();
     layout();
     computePhases();
     applyTrain(driverAngle);
     updateRatio();
+    updateSizeButtons();
   });
 
   var howBtn = document.getElementById("how");
@@ -665,6 +858,7 @@ color: orange
   buildTrain();
   resize();
   updateRatio();
+  updateSizeButtons();
   requestAnimationFrame(frame);
   requestAnimationFrame(function () { stage.classList.add("ready"); });
 })();

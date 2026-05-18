@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Wave Tank
-description: A top-down water tank — tap to send ripples spreading out, switch on a second source, and watch the waves cross and interfere.
+description: A top-down water tank — tap for ripples, dial the frequency and amplitude, drop a wall with a slit to watch waves bend through it, and see the wave speed.
 emoji: 🌊
 color: teal
 -->
@@ -116,6 +116,61 @@ color: teal
     -webkit-backdrop-filter: blur(10px);
     max-width: 92vw;
   }
+  /* slider panel in the bottom info bar */
+  #sliders {
+    pointer-events: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 16px;
+    background: var(--panel);
+    border: 1px solid rgba(79, 227, 214, 0.30);
+    border-radius: 14px;
+    padding: 9px 15px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    max-width: 94vw;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .slider-row .lbl {
+    font-size: clamp(12px, 3.2vw, 14px);
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+    min-width: 62px;
+  }
+  input[type="range"].wave {
+    -webkit-appearance: none;
+    appearance: none;
+    width: clamp(96px, 30vw, 170px);
+    height: 14px;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #0a4048, #4fe3d6);
+    outline: none;
+    margin: 0;
+  }
+  input[type="range"].wave::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #e3fbf8, #2bb6cf);
+    border: 2px solid #e3fbf8;
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+  }
+  input[type="range"].wave::-moz-range-thumb {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #e3fbf8, #2bb6cf);
+    border: 2px solid #e3fbf8;
+    cursor: pointer;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.45);
+  }
   #howBtn { pointer-events: auto; }
   #howPanel {
     pointer-events: auto;
@@ -149,6 +204,7 @@ color: teal
   <div class="spacer"></div>
   <div class="controls">
     <button id="srcBtn" type="button">2nd Source: Off</button>
+    <button id="barrierBtn" type="button">Wall: Off</button>
     <button id="calmBtn" type="button">Calm</button>
   </div>
 </div>
@@ -159,8 +215,21 @@ color: teal
     <p>Turn on the <b>2nd source</b> and two sets of ripples will cross each other.</p>
     <p>Where two crests meet, the wave gets <b>extra big and bright</b> — that is constructive interference.</p>
     <p>Where a crest meets a dip, they <b>cancel out</b> and the water goes flat and dark.</p>
+    <p>The <b>Frequency</b> slider sets how close together the ripples are. The <b>Amplitude</b> slider sets how tall and strong they are.</p>
+    <p>Turn on the <b>Wall</b> — it has a small gap. Waves squeeze through the slit and <b>bend out in a fan</b> on the far side. That bending is called diffraction.</p>
+    <p>The readout shows the <b>wave speed</b> — how fast each crest races across the tank.</p>
   </div>
   <div id="hint">Tap the water to make a ripple</div>
+  <div id="sliders">
+    <div class="slider-row">
+      <span class="lbl">Frequency</span>
+      <input id="freq" class="wave" type="range" min="0" max="100" value="50" aria-label="Frequency">
+    </div>
+    <div class="slider-row">
+      <span class="lbl">Amplitude</span>
+      <input id="amp" class="wave" type="range" min="0" max="100" value="60" aria-label="Amplitude">
+    </div>
+  </div>
   <button id="howBtn" type="button">How it works</button>
 </div>
 
@@ -174,10 +243,13 @@ color: teal
   if (!ctx) return;
 
   var srcBtn = document.getElementById("srcBtn");
+  var barrierBtn = document.getElementById("barrierBtn");
   var calmBtn = document.getElementById("calmBtn");
   var hint = document.getElementById("hint");
   var howBtn = document.getElementById("howBtn");
   var howPanel = document.getElementById("howPanel");
+  var freqSlider = document.getElementById("freq");
+  var ampSlider = document.getElementById("amp");
 
   var W = 0, H = 0, DPR = 1;
 
@@ -193,9 +265,21 @@ color: teal
   var buf = null;          // backing canvas for the coarse field
   var bufCtx = null;
 
-  var WAVELENGTH = 58;     // px between crests
-  var SPEED = 150;         // px per second the wavefront travels
+  var WAVELENGTH = 58;     // px between crests (changed by the Frequency slider)
+  var SPEED = 150;         // px per second the wavefront travels (fixed)
   var DAMP = 360;          // px distance over which a ripple fades
+
+  // user controls (0..1 fractions from the sliders)
+  var freqLevel = 0.5;     // 0 = long lazy waves, 1 = short busy waves
+  var ampLevel = 0.6;      // 0 = barely a ripple, 1 = big strong waves
+
+  // barrier: a horizontal wall with a centered gap. When on, continuous-source
+  // waves above the wall are blocked, and pass through the slit, fanning out
+  // from the gap (Huygens-style) so kids see diffraction.
+  var barrierOn = false;
+  var barrierY = 0;        // y of the wall (set on resize)
+  var gapHalf = 0;         // half-width of the slit
+  var gapX = 0;            // x center of the slit
 
   // continuous sources (the optional 2nd source, and 1st when toggled on)
   // each: {x,y, on}
@@ -237,16 +321,22 @@ color: teal
   }
 
   // Position the continuous sources. Source 0 lives left-of-center, source 1
-  // right-of-center; both off until enabled.
+  // right-of-center; both off until enabled. They sit above the barrier line
+  // so that, with the wall on, their waves must pass through the slit.
   function placeSources() {
+    var sy = H * 0.40;
     contSources = [
-      { x: W * 0.34, y: H * 0.52, on: false },
-      { x: W * 0.66, y: H * 0.52, on: false }
+      { x: W * 0.36, y: sy, on: false },
+      { x: W * 0.64, y: sy, on: false }
     ];
     if (twoSources) {
       contSources[0].on = true;
       contSources[1].on = true;
     }
+    // barrier geometry: a horizontal wall low in the tank with a centered slit
+    barrierY = H * 0.64;
+    gapX = W * 0.5;
+    gapHalf = Math.max(22, Math.min(46, W * 0.07));
   }
 
   function rippleAt(x, y) {
@@ -261,12 +351,46 @@ color: teal
   var OMEGA = 0;
 
   function recomputeConstants() {
+    // Frequency slider sets the wavelength: low slider = long lazy waves
+    // (90px crests), high slider = short busy waves (34px crests).
+    WAVELENGTH = 90 - freqLevel * 56;
     K = TWO_PI / WAVELENGTH;
     OMEGA = K * SPEED; // so phase = k*r - omega*t keeps crest speed = SPEED
   }
 
-  // height contribution of a continuous source at distance r
+  // overall wave height multiplier from the Amplitude slider (0.15 .. 1.6)
+  function ampScale() {
+    return 0.15 + ampLevel * 1.45;
+  }
+
+  // Effective propagation distance from a source to a point, accounting for
+  // the barrier. If the wall is on and the point is on the far side of it,
+  // the wave must travel to the slit first, then fan out from the slit.
+  // Returns -1 when the point is blocked by solid wall (no path).
+  function pathLen(sx, sy, px, py) {
+    if (!barrierOn) {
+      var dx = px - sx, dy = py - sy;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    var srcAbove = sy < barrierY;
+    var ptAbove = py < barrierY;
+    if (srcAbove === ptAbove) {
+      // same side of the wall: straight-line travel
+      var dx2 = px - sx, dy2 = py - sy;
+      return Math.sqrt(dx2 * dx2 + dy2 * dy2);
+    }
+    // opposite sides: the wave goes through the slit (a Huygens secondary
+    // source at the gap). Total path = source->slit + slit->point.
+    var d1x = gapX - sx, d1y = barrierY - sy;
+    var d2x = px - gapX, d2y = py - barrierY;
+    var l1 = Math.sqrt(d1x * d1x + d1y * d1y);
+    var l2 = Math.sqrt(d2x * d2x + d2y * d2y);
+    return l1 + l2;
+  }
+
+  // height contribution of a continuous source at effective distance r
   function contHeight(r, t) {
+    if (r < 0) return 0;
     // wavefront has travelled SPEED*t; only affect points it has reached
     var front = SPEED * t;
     if (r > front) return 0;
@@ -293,21 +417,33 @@ color: teal
     var i;
     for (i = 0; i < n; i++) grid[i] = 0;
 
+    var amp = ampScale();
+    var bOn = barrierOn;
+    var bY = barrierY;
+
     // continuous sources
     var cs;
     for (cs = 0; cs < contSources.length; cs++) {
       var src = contSources[cs];
       if (!src.on) continue;
       var sx = src.x, sy = src.y;
+      var srcAbove = sy < bY;
       var idx = 0;
       for (var ry = 0; ry < rows; ry++) {
         var py = ry * CELL;
         var dy = py - sy;
+        var ptAbove = py < bY;
+        var crossing = bOn && (srcAbove !== ptAbove);
         for (var rx = 0; rx < cols; rx++) {
           var px = rx * CELL;
-          var dx = px - sx;
-          var r = Math.sqrt(dx * dx + dy * dy);
-          grid[idx] += contHeight(r, t);
+          var r;
+          if (crossing) {
+            r = pathLen(sx, sy, px, py);
+          } else {
+            var dx = px - sx;
+            r = Math.sqrt(dx * dx + dy * dy);
+          }
+          grid[idx] += contHeight(r, t) * amp;
           idx++;
         }
       }
@@ -321,22 +457,30 @@ color: teal
       var front = SPEED * age;
       if (front - DAMP > Math.max(W, H) * 1.5) continue; // fully gone
       var rsx = rp.x, rsy = rp.y;
+      var rpAbove = rsy < bY;
       var idx2 = 0;
       for (var ry2 = 0; ry2 < rows; ry2++) {
         var py2 = ry2 * CELL;
         var dy2 = py2 - rsy;
+        var pt2Above = py2 < bY;
+        var crossing2 = bOn && (rpAbove !== pt2Above);
         for (var rx2 = 0; rx2 < cols; rx2++) {
           var px2 = rx2 * CELL;
-          var dx2 = px2 - rsx;
-          var r2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-          if (r2 <= front) {
+          var r2;
+          if (crossing2) {
+            r2 = pathLen(rsx, rsy, px2, py2);
+          } else {
+            var dx2 = px2 - rsx;
+            r2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+          }
+          if (r2 >= 0 && r2 <= front) {
             var phase2 = K * r2 - OMEGA * age;
             // ring envelope: bump near the wavefront, decays with age & distance
             var behind = front - r2;
             var ringEnv = Math.exp(-behind * behind / (2 * 90 * 90));
             var distFade = 1 / (1 + r2 / 150);
             var ageFade = Math.exp(-age * 0.55);
-            grid[idx2] += Math.sin(phase2) * ringEnv * distFade * ageFade * 1.5;
+            grid[idx2] += Math.sin(phase2) * ringEnv * distFade * ageFade * 1.5 * amp;
           }
           idx2++;
         }
@@ -402,6 +546,9 @@ color: teal
     ctx.fillStyle = vg;
     ctx.fillRect(0, 0, W, H);
 
+    // the barrier wall (drawn over the water so the slit reads clearly)
+    if (barrierOn) drawBarrier();
+
     // draw the source markers
     for (var s = 0; s < contSources.length; s++) {
       var src = contSources[s];
@@ -413,6 +560,101 @@ color: teal
     ctx.strokeStyle = "rgba(79,227,214,0.35)";
     ctx.lineWidth = 4;
     roundRectStroke(6, 6, W - 12, H - 12, 18);
+
+    // wave-speed readout
+    drawSpeedReadout();
+  }
+
+  // a solid wall across the tank with a centered gap (the slit)
+  function drawBarrier() {
+    var th = Math.max(12, Math.min(20, H * 0.025)); // wall thickness
+    var y0 = barrierY - th / 2;
+    var leftEnd = gapX - gapHalf;
+    var rightEnd = gapX + gapHalf;
+
+    ctx.fillStyle = "#0a2c33";
+    ctx.strokeStyle = "rgba(79,227,214,0.55)";
+    ctx.lineWidth = 2;
+
+    // left wall segment (from tank edge to slit)
+    if (leftEnd > 8) {
+      roundRectFill(8, y0, leftEnd - 8, th, 6);
+    }
+    // right wall segment (from slit to tank edge)
+    if (rightEnd < W - 8) {
+      roundRectFill(rightEnd, y0, (W - 8) - rightEnd, th, 6);
+    }
+
+    // glow the slit edges so kids see where the gap is
+    var gp = 0.5 + 0.4 * Math.sin(nowSec * 4);
+    ctx.fillStyle = "rgba(150,242,233," + (0.25 + 0.25 * gp) + ")";
+    ctx.beginPath();
+    ctx.arc(leftEnd, barrierY, th * 0.55, 0, Math.PI * 2);
+    ctx.arc(rightEnd, barrierY, th * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function roundRectFill(x, y, w, h, r) {
+    if (w <= 0 || h <= 0) return;
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // wave-speed readout chip in the top-left of the tank
+  function drawSpeedReadout() {
+    var pad = 14;
+    var fs = Math.max(12, Math.min(16, W * 0.032));
+    // crests cross the tank at SPEED px/s; show a kid-friendly speed plus the
+    // current wavelength so the Frequency slider visibly changes the number.
+    var speedTxt = "Wave speed: " + Math.round(SPEED / 10) + " cm/s";
+    var waveTxt = "Crest gap: " + Math.round(WAVELENGTH / 5) + " cm";
+    ctx.font = "600 " + Math.round(fs) + "px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    var w1 = ctx.measureText(speedTxt).width;
+    var w2 = ctx.measureText(waveTxt).width;
+    var boxW = Math.max(w1, w2) + 22;
+    var lineH = fs * 1.5;
+    var boxH = lineH * 2 + 10;
+    var bx = pad, by = pad + 4;
+    // keep clear of the HUD title which also sits top-left
+    var hudEl = document.getElementById("hud");
+    if (hudEl) {
+      var hb = hudEl.getBoundingClientRect();
+      by = Math.max(by, hb.height + 8);
+    }
+    if (by + boxH > H - 110) by = Math.max(pad, H - 110 - boxH);
+
+    ctx.fillStyle = "rgba(8,42,49,0.86)";
+    roundRectFillNoStroke(bx, by, boxW, boxH, 12);
+    ctx.strokeStyle = "rgba(79,227,214,0.30)";
+    ctx.lineWidth = 1.5;
+    roundRectStroke(bx, by, boxW, boxH, 12);
+
+    ctx.fillStyle = "#9af2e9";
+    ctx.fillText(speedTxt, bx + 11, by + 5 + lineH / 2);
+    ctx.fillStyle = "#9fd6d2";
+    ctx.fillText(waveTxt, bx + 11, by + 5 + lineH * 1.5);
+  }
+
+  function roundRectFillNoStroke(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawSourceMarker(x, y, pulsing) {
@@ -481,6 +723,23 @@ color: teal
     }
   });
 
+  barrierBtn.addEventListener("click", function () {
+    barrierOn = !barrierOn;
+    barrierBtn.textContent = barrierOn ? "Wall: On" : "Wall: Off";
+    barrierBtn.classList.toggle("on", barrierOn);
+    if (barrierOn) {
+      // turn a source on so there is something to diffract, if all are off
+      if (!contSources[0].on && !contSources[1].on && ripples.length === 0) {
+        contSources[0].on = true;
+        hint.textContent = "Waves squeeze through the slit and fan out — that is diffraction";
+      } else {
+        hint.textContent = "Watch the waves bend as they pass through the slit";
+      }
+    } else {
+      hint.textContent = "Tap the water to make a ripple";
+    }
+  });
+
   calmBtn.addEventListener("click", function () {
     ripples = [];
     twoSources = false;
@@ -488,9 +747,25 @@ color: teal
     srcBtn.classList.remove("on");
     contSources[0].on = false;
     contSources[1].on = false;
+    barrierOn = false;
+    barrierBtn.textContent = "Wall: Off";
+    barrierBtn.classList.remove("on");
     // reset the clock so old continuous phase doesn't linger
     startTime = 0;
     hint.textContent = "Tap the water to make a ripple";
+  });
+
+  freqSlider.addEventListener("input", function () {
+    var v = parseInt(freqSlider.value, 10);
+    if (isNaN(v)) v = 50;
+    freqLevel = v / 100;
+    recomputeConstants();
+  });
+
+  ampSlider.addEventListener("input", function () {
+    var v = parseInt(ampSlider.value, 10);
+    if (isNaN(v)) v = 60;
+    ampLevel = v / 100;
   });
 
   howBtn.addEventListener("click", function () {
@@ -501,6 +776,12 @@ color: teal
   window.addEventListener("resize", resize);
 
   // --- boot ---
+  (function initSliders() {
+    var f = parseInt(freqSlider.value, 10);
+    var a = parseInt(ampSlider.value, 10);
+    freqLevel = isNaN(f) ? 0.5 : f / 100;
+    ampLevel = isNaN(a) ? 0.6 : a / 100;
+  })();
   recomputeConstants();
   resize();
   requestAnimationFrame(frame);

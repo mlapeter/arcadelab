@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Spacetime Sheet
-description: A mesmerizing gravity sandbox — a heavy mass dents a rubber-sheet grid, and flicked marbles roll down the curve, orbiting and spiraling just like planets around a star.
+description: A mesmerizing gravity sandbox — place several heavy stars that dent a rubber-sheet grid, then drag-aim and flick glowing marbles. They leave orbit trails as they spiral around a star, or weave through a ready-made binary pair.
 emoji: 🌌
 color: purple
 -->
@@ -88,6 +88,33 @@ color: purple
   }
   button:hover { background: rgba(48, 30, 88, 0.95); border-color: var(--accent); }
   button:active { transform: scale(0.94); }
+  button.on {
+    background: linear-gradient(180deg, #b98cff, #7d4ed0);
+    color: #16092e;
+    border-color: var(--accent2);
+  }
+  .pgroup {
+    display: flex;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid rgba(185, 140, 255, 0.30);
+    border-radius: 15px;
+    padding: 5px;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .pgroup button {
+    background: transparent;
+    border: none;
+    min-width: 46px;
+    padding: 9px 12px;
+  }
+  .pgroup button:hover { background: rgba(185, 140, 255, 0.18); }
+  .pgroup button.on {
+    background: linear-gradient(180deg, #b98cff, #7d4ed0);
+    color: #16092e;
+  }
   .massbox {
     display: flex;
     align-items: center;
@@ -199,7 +226,12 @@ color: purple
     <label for="mass">Mass</label>
     <input id="mass" type="range" min="0" max="100" value="55">
   </div>
+  <div class="pgroup">
+    <button id="modeFlick" type="button">Flick</button>
+    <button id="modeMass" type="button">+Mass</button>
+  </div>
   <div class="controls">
+    <button id="binary" type="button">Binary</button>
     <button id="clear" type="button">Clear</button>
   </div>
 </div>
@@ -209,6 +241,7 @@ color: purple
     <h3>How it works</h3>
     <p>Heavy things bend space around them, like a bowling ball on a stretchy sheet.</p>
     <p>Marbles you flick aren't pushed by a force — they just roll straight, but the bent sheet curves their path.</p>
+    <p>In <b>Flick</b> mode, drag back and let go — the arrow shows your aim and speed. In <b>+Mass</b> mode, tap to add more heavy stars. Try the <b>Binary</b> button for two stars dancing together!</p>
     <p>That curve is gravity! Some marbles fall in, some swing into orbits, just like planets around the Sun.</p>
   </div>
   <div id="hint">Flick anywhere to send a marble across the warped grid</div>
@@ -242,11 +275,21 @@ color: purple
     [150, 72, 66], [262, 88, 78], [12, 92, 72]
   ];
 
-  // mass: 0..1 fraction from slider
+  // mass: 0..1 fraction from slider — sets the size of newly placed masses
   var massFrac = 0.55;
 
-  // central mass position (world coords, on the sheet plane)
-  var mass = { x: 0, y: 0 };
+  // all the heavy masses on the sheet (world coords). Each has its own
+  // strength `m` (0..1). The first one is created at boot.
+  var masses = [];
+  var MAX_MASSES = 6;
+
+  // interaction mode: "flick" launches marbles, "mass" places masses on tap
+  var mode = "flick";
+
+  function addMass(x, y, m) {
+    if (masses.length >= MAX_MASSES) masses.shift();
+    masses.push({ x: x, y: y, m: clamp(m, 0, 1) });
+  }
 
   // perspective projection params (recomputed on resize)
   var proj = {
@@ -278,8 +321,6 @@ color: purple
     proj.halfW = 1.0;                     // world units: sheet from -1..1
     proj.scale = Math.min(W * 0.46, H * 0.62);
     proj.tilt = clamp(H / W, 0.34, 0.62); // taller screens => more tilt
-    mass.x = 0;
-    mass.y = 0;
 
     makeStars();
   }
@@ -302,33 +343,40 @@ color: purple
 
   // ---- the well: depth of the sheet at world point (x,y) ----
   // depth is positive going "down". Visualized by lowering screen-y.
+  // Each mass adds its own funnel; we sum them.
   function wellDepth(x, y) {
-    var dx = x - mass.x;
-    var dy = y - mass.y;
-    var r = Math.sqrt(dx * dx + dy * dy);
-    // smooth funnel: deeper near center, scaled by mass
-    var strength = 0.06 + massFrac * 0.95;
     var core = 0.16;                       // core softening radius
-    // depth ~ strength / (r + core), capped
-    var d = strength * core / (r + core);
+    var d = 0;
+    for (var i = 0; i < masses.length; i++) {
+      var ms = masses[i];
+      var dx = x - ms.x;
+      var dy = y - ms.y;
+      var r = Math.sqrt(dx * dx + dy * dy);
+      var strength = 0.06 + ms.m * 0.95;
+      d += strength * core / (r + core);
+    }
     return d;
   }
 
   // gradient of depth (downhill direction) for marble physics.
-  // returns acceleration vector pointing toward the dip.
+  // returns acceleration vector summed over every mass.
   function gravityAccel(x, y) {
-    var dx = mass.x - x;
-    var dy = mass.y - y;
-    var r2 = dx * dx + dy * dy;
     var soft = 0.026;                      // softening so it never blows up
-    var r = Math.sqrt(r2 + soft);
-    var strength = 0.10 + massFrac * 2.6;
-    // inverse-square-ish pull, gentle
-    var f = strength / (r2 + soft) ;
-    // cap acceleration magnitude
     var maxF = 60;
-    if (f > maxF) f = maxF;
-    return { ax: dx / r * f, ay: dy / r * f };
+    var ax = 0, ay = 0;
+    for (var i = 0; i < masses.length; i++) {
+      var ms = masses[i];
+      var dx = ms.x - x;
+      var dy = ms.y - y;
+      var r2 = dx * dx + dy * dy;
+      var r = Math.sqrt(r2 + soft);
+      var strength = 0.10 + ms.m * 2.6;
+      var f = strength / (r2 + soft);
+      if (f > maxF) f = maxF;
+      ax += dx / r * f;
+      ay += dy / r * f;
+    }
+    return { ax: ax, ay: ay };
   }
 
   // ---- project a world point on the (warped) sheet to screen coords ----
@@ -375,12 +423,15 @@ color: purple
       m.vy += a1.ay * dt * 0.5;
       m.age += dt;
 
-      // swallowed by the central mass
-      var dx = m.x - mass.x, dy = m.y - mass.y;
-      var rr = dx * dx + dy * dy;
-      var swallowR = 0.05 + massFrac * 0.05;
-      if (rr < swallowR * swallowR) {
-        m.alive = false;
+      // swallowed by any mass it falls into
+      for (var k = 0; k < masses.length; k++) {
+        var ms = masses[k];
+        var dx = m.x - ms.x, dy = m.y - ms.y;
+        var swallowR = 0.05 + ms.m * 0.05;
+        if (dx * dx + dy * dy < swallowR * swallowR) {
+          m.alive = false;
+          break;
+        }
       }
       // wandered far off the sheet
       if (m.x < -2.0 || m.x > 2.0 || m.y < -2.0 || m.y > 2.0) {
@@ -403,6 +454,18 @@ color: purple
   }
 
   // ---- rendering ----
+  function roundRectS(x, y, w, h, r) {
+    if (r > w / 2) r = w / 2;
+    if (r > h / 2) r = h / 2;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
   function drawBackground(time) {
     ctx.fillStyle = "#07041a";
     ctx.fillRect(0, 0, W, H);
@@ -475,11 +538,11 @@ color: purple
     }
   }
 
-  function drawCentralMass(time) {
-    var c = project(mass.x, mass.y);
-    var baseR = (0.10 + massFrac * 0.55) * proj.scale * 0.5;
-    baseR = Math.max(14, baseR);
-    var pulse = 1 + 0.05 * Math.sin(time * 0.002);
+  function drawOneMass(ms, time, idx) {
+    var c = project(ms.x, ms.y);
+    var baseR = (0.10 + ms.m * 0.55) * proj.scale * 0.5;
+    baseR = Math.max(13, baseR);
+    var pulse = 1 + 0.05 * Math.sin(time * 0.002 + idx * 1.7);
     var r = baseR * pulse;
 
     // halo
@@ -510,6 +573,14 @@ color: purple
     ctx.beginPath();
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
     ctx.stroke();
+  }
+
+  function drawMasses(time) {
+    // draw far masses first so nearer ones overlap correctly
+    var order = masses.slice().sort(function (a, b) { return a.y - b.y; });
+    for (var i = 0; i < order.length; i++) {
+      drawOneMass(order[i], time, i);
+    }
   }
 
   function drawMarbles(time) {
@@ -574,9 +645,11 @@ color: purple
   var aimPointerId = null;
   var aimStart = { x: 0, y: 0 };   // screen coords
   var aimNow = { x: 0, y: 0 };
+  // ghost-star cursor position for +Mass mode (null when finger is off-canvas)
+  var ghost = { x: null, y: null };
 
   function drawAim() {
-    if (!aiming) return;
+    if (!aiming || mode !== "flick") return;
     var dx = aimStart.x - aimNow.x;
     var dy = aimStart.y - aimNow.y;
     ctx.setLineDash([7, 7]);
@@ -599,6 +672,22 @@ color: purple
       ctx.lineTo(aimStart.x - ah * Math.cos(ang + 0.4), aimStart.y - ah * Math.sin(ang + 0.4));
       ctx.closePath();
       ctx.fill();
+
+      // speed readout near the finger — 0..100 scaled by drag length
+      var spd = Math.min(100, Math.round(len / 2.6));
+      var label = "Speed " + spd;
+      ctx.font = "700 13px system-ui, sans-serif";
+      var tw = ctx.measureText(label).width;
+      var bx = aimNow.x + 16, by = aimNow.y + 16;
+      if (bx + tw + 14 > W) bx = aimNow.x - tw - 30;
+      if (by + 24 > H) by = aimNow.y - 30;
+      ctx.fillStyle = "rgba(26,16,54,0.92)";
+      roundRectS(bx, by, tw + 18, 24, 9);
+      ctx.fill();
+      ctx.fillStyle = "#e0b3ff";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, bx + 9, by + 13);
     }
     // ghost marble at start
     var pg = ctx.createRadialGradient(aimNow.x, aimNow.y, 0, aimNow.x, aimNow.y, 16);
@@ -617,9 +706,38 @@ color: purple
   function draw(time) {
     drawBackground(time);
     drawGrid(time);
-    drawCentralMass(time);
+    drawMasses(time);
     drawMarbles(time);
     drawAim();
+    drawMassGhost(time);
+  }
+
+  // in +Mass mode, show a faint ghost star where a tap will drop a new mass.
+  // Follows the live finger position while placing, or the last hover point.
+  function drawMassGhost(time) {
+    if (mode !== "mass") return;
+    var gx, gy;
+    if (aiming) { gx = aimNow.x; gy = aimNow.y; }
+    else if (ghost.x !== null) { gx = ghost.x; gy = ghost.y; }
+    else return;
+    var r = (0.10 + massFrac * 0.55) * proj.scale * 0.5;
+    r = Math.max(13, r);
+    var pulse = 0.5 + 0.2 * Math.sin(time * 0.006);
+    ctx.globalAlpha = pulse;
+    ctx.strokeStyle = "rgba(224,179,255,0.9)";
+    ctx.setLineDash([6, 6]);
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(gx, gy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // plus sign in the centre
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(gx - 8, gy); ctx.lineTo(gx + 8, gy);
+    ctx.moveTo(gx, gy - 8); ctx.lineTo(gx, gy + 8);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
   }
 
   // ---- main loop ----
@@ -665,15 +783,18 @@ color: purple
     aimPointerId = e.pointerId;
     aimStart.x = pt.x; aimStart.y = pt.y;
     aimNow.x = pt.x; aimNow.y = pt.y;
+    ghost.x = pt.x; ghost.y = pt.y;
     if (canvas.setPointerCapture) {
       try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     }
   });
 
   canvas.addEventListener("pointermove", function (e) {
+    var pt = pointFromEvent(e);
+    // keep the +Mass ghost cursor following any hover/drag
+    ghost.x = pt.x; ghost.y = pt.y;
     if (!aiming || e.pointerId !== aimPointerId) return;
     e.preventDefault();
-    var pt = pointFromEvent(e);
     aimNow.x = pt.x; aimNow.y = pt.y;
   });
 
@@ -682,6 +803,18 @@ color: purple
     e.preventDefault();
     aiming = false;
     aimPointerId = null;
+
+    // ---- +Mass mode: a tap or drag drops a new heavy star ----
+    if (mode === "mass") {
+      var mw = screenToWorld(aimNow.x, aimNow.y);
+      mw.x = clamp(mw.x, -1.15, 1.15);
+      mw.y = clamp(mw.y, -1.15, 1.15);
+      addMass(mw.x, mw.y, massFrac);
+      hintEl.textContent = masses.length >= MAX_MASSES
+        ? "That's a lot of stars! Flick marbles to watch them weave."
+        : "Star added! Tap again, or switch to Flick to launch marbles.";
+      return;
+    }
 
     // marble starts where the pointer currently is; velocity along the flick.
     var startW = screenToWorld(aimNow.x, aimNow.y);
@@ -696,25 +829,41 @@ color: purple
     var wvx = vx * velScale;
     var wvy = (vy * velScale) / proj.tilt;
 
-    if (pxLen < 8) {
+    var near = nearestMass(startW.x, startW.y);
+    if (pxLen < 8 && near) {
       // a tap: drop a marble that gets a gentle sideways nudge for an orbit
-      var dx = startW.x - mass.x;
-      var dy = startW.y - mass.y;
+      // around whichever mass is closest.
+      var dx = startW.x - near.x;
+      var dy = startW.y - near.y;
       var r = Math.sqrt(dx * dx + dy * dy) || 0.001;
       // tangential direction
-      var orbitSpeed = Math.sqrt((0.10 + massFrac * 2.6) / r) * 0.85;
+      var orbitSpeed = Math.sqrt((0.10 + near.m * 2.6) / r) * 0.85;
       wvx = -dy / r * orbitSpeed;
       wvy = dx / r * orbitSpeed;
     }
 
-    // don't spawn right on top of the mass
-    var ddx = startW.x - mass.x, ddy = startW.y - mass.y;
-    if (ddx * ddx + ddy * ddy < 0.02) {
-      startW.x += 0.25;
+    // don't spawn right on top of a mass
+    if (near) {
+      var ddx = startW.x - near.x, ddy = startW.y - near.y;
+      if (ddx * ddx + ddy * ddy < 0.02) {
+        startW.x += 0.25;
+      }
     }
 
     if (marbles.length > 40) marbles.shift();
     marbles.push(makeMarble(startW.x, startW.y, wvx, wvy));
+  }
+
+  // find the mass closest to a world point (null if there are none)
+  function nearestMass(x, y) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < masses.length; i++) {
+      var ms = masses[i];
+      var dx = ms.x - x, dy = ms.y - y;
+      var d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = ms; }
+    }
+    return best;
   }
 
   canvas.addEventListener("pointerup", endAim);
@@ -726,10 +875,41 @@ color: purple
   });
 
   // ---- controls ----
+  // The slider sets the size of new stars AND live-resizes the most recent
+  // one, so with a single star it behaves just like before.
   massSlider.addEventListener("input", function () {
     var v = parseFloat(massSlider.value);
     if (isNaN(v)) v = 55;
     massFrac = clamp(v / 100, 0, 1);
+    if (masses.length > 0) masses[masses.length - 1].m = massFrac;
+  });
+
+  var modeFlickBtn = document.getElementById("modeFlick");
+  var modeMassBtn = document.getElementById("modeMass");
+  function setMode(m) {
+    mode = m;
+    if (modeFlickBtn) modeFlickBtn.classList.toggle("on", m === "flick");
+    if (modeMassBtn) modeMassBtn.classList.toggle("on", m === "mass");
+    hintEl.textContent = m === "mass"
+      ? "Tap the sheet to place a heavy star (up to " + MAX_MASSES + ")"
+      : "Flick anywhere to send a marble across the warped grid";
+  }
+  if (modeFlickBtn) modeFlickBtn.addEventListener("click", function () { setMode("flick"); });
+  if (modeMassBtn) modeMassBtn.addEventListener("click", function () { setMode("mass"); });
+
+  // Binary: two equal stars side by side with marbles orbiting the pair.
+  // The pair sits a little above world-center so the deep well it digs
+  // still leaves both stars comfortably on screen (not clipped at the bottom).
+  var BINARY_CY = -0.48;
+  document.getElementById("binary").addEventListener("click", function () {
+    masses = [];
+    marbles = [];
+    var bm = Math.max(0.55, massFrac);
+    addMass(-0.42, BINARY_CY, bm);
+    addMass(0.42, BINARY_CY, bm);
+    setMode("flick");
+    seedBinary(bm);
+    hintEl.textContent = "Two stars! Watch marbles weave around the pair.";
   });
 
   document.getElementById("clear").addEventListener("click", function () {
@@ -742,15 +922,34 @@ color: purple
     howPanel.classList.toggle("show");
   });
 
-  // ---- seed a couple of pleasant orbits ----
+  // ---- seed a couple of pleasant orbits around the first mass ----
   function seed() {
+    var center = masses[0] || { x: 0, y: 0, m: massFrac };
     var radii = [0.42, 0.62];
     for (var i = 0; i < radii.length; i++) {
       var ang = rand(0, Math.PI * 2);
       var r = radii[i];
-      var x = mass.x + Math.cos(ang) * r;
-      var y = mass.y + Math.sin(ang) * r;
-      var orbitSpeed = Math.sqrt((0.10 + massFrac * 2.6) / r) * 0.92;
+      var x = center.x + Math.cos(ang) * r;
+      var y = center.y + Math.sin(ang) * r;
+      var orbitSpeed = Math.sqrt((0.10 + center.m * 2.6) / r) * 0.92;
+      var dir = i % 2 === 0 ? 1 : -1;
+      var vx = -Math.sin(ang) * orbitSpeed * dir;
+      var vy = Math.cos(ang) * orbitSpeed * dir;
+      marbles.push(makeMarble(x, y, vx, vy));
+    }
+  }
+
+  // ---- seed marbles that loop around the whole binary pair ----
+  function seedBinary(bm) {
+    var radii = [0.95, 1.18, 1.18];
+    for (var i = 0; i < radii.length; i++) {
+      var ang = rand(0, Math.PI * 2);
+      var r = radii[i];
+      // orbit around the binary pair's centre (which is lifted by BINARY_CY)
+      var x = Math.cos(ang) * r;
+      var y = BINARY_CY + Math.sin(ang) * r;
+      // pair acts like one mass of ~2x bm at the centre for a wide orbit
+      var orbitSpeed = Math.sqrt((0.10 + bm * 2.6 * 2) / r) * 0.78;
       var dir = i % 2 === 0 ? 1 : -1;
       var vx = -Math.sin(ang) * orbitSpeed * dir;
       var vy = Math.cos(ang) * orbitSpeed * dir;
@@ -762,6 +961,8 @@ color: purple
   window.addEventListener("resize", resize);
   resize();
   massFrac = clamp(parseFloat(massSlider.value) / 100, 0, 1);
+  addMass(0, 0, massFrac);   // the starting central star
+  setMode("flick");
   seed();
   requestAnimationFrame(function () {
     requestAnimationFrame(frame);

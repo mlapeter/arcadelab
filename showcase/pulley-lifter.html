@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Pulley Lifter
-description: A hands-on machines sandbox — thread 1, 2, or 3 pulleys, then drag the rope to lift a heavy crate and feel how more pulleys trade extra rope for an easier pull.
+description: A hands-on machines sandbox — thread 1, 2, or 3 pulleys, then drag the rope to lift a heavy crate. Watch force arrows, see your pull force in kg, the rope length you pulled, and a confetti win when the crate reaches the top.
 emoji: 🏗️
 color: teal
 -->
@@ -178,8 +178,9 @@ color: teal
   <div id="howPanel">
     <h3>How it works</h3>
     <p>A pulley is a wheel that changes the way you pull a rope.</p>
-    <p>With more pulleys sharing the load, you pull with <b>less force</b> — but you must pull <b>more rope</b> to lift the crate the same height.</p>
-    <p>2 pulleys = half the pull. 3 pulleys = a third of the pull. Machines trade effort for distance!</p>
+    <p>The <b>blue arrow</b> is the crate's heavy weight pulling down. The <b>orange arrow</b> is how hard <b>you</b> pull. More pulleys make your arrow shorter!</p>
+    <p>With more pulleys sharing the load, you pull with <b>less force</b> — but you must pull <b>more rope</b>. The meters show your pull in kg and how much rope you've pulled.</p>
+    <p>2 pulleys = half the pull. 3 pulleys = a third of the pull. Lift it all the way for a confetti cheer!</p>
   </div>
   <div id="hint">Drag the orange rope handle down to lift the crate</div>
   <button id="howBtn" type="button">How it works</button>
@@ -213,8 +214,30 @@ color: teal
 
   // pulse for "lifted" celebration
   var celebrate = 0;
+  var wonOnce = false;       // has the crate been fully lifted this run?
+  var confetti = [];         // confetti particles for the win moment
 
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+  // spawn a burst of confetti when the crate reaches the top
+  function spawnConfetti(cx, cy) {
+    var colors = ["#2fd6c4", "#7af0dd", "#f4a23c", "#ffce7a", "#fff4e0"];
+    for (var i = 0; i < 46; i++) {
+      var ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3;
+      var sp = 120 + Math.random() * 280;
+      confetti.push({
+        x: cx + (Math.random() - 0.5) * 40,
+        y: cy,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp,
+        rot: Math.random() * Math.PI * 2,
+        vr: (Math.random() - 0.5) * 12,
+        size: 5 + Math.random() * 6,
+        color: colors[(Math.random() * colors.length) | 0],
+        life: 1
+      });
+    }
+  }
 
   // ---- layout / resize ----
   function resize() {
@@ -291,10 +314,19 @@ color: teal
 
   // ---- physics-ish update ----
   function update(dt) {
-    // smooth the crate toward target lift
-    var target = lift;
     // (lift itself is set by dragging; here we just animate celebrate)
     if (celebrate > 0) celebrate = Math.max(0, celebrate - dt);
+
+    // advance confetti
+    for (var i = confetti.length - 1; i >= 0; i--) {
+      var p = confetti[i];
+      p.vy += 620 * dt;          // gravity
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+      p.life -= dt * 0.55;
+      if (p.life <= 0 || p.y > H + 40) confetti.splice(i, 1);
+    }
   }
 
   // ---- rendering ----
@@ -366,6 +398,61 @@ color: teal
     ctx.moveTo(ax, ay);
     ctx.lineTo(bx, by);
     ctx.stroke();
+  }
+
+  // draw a thick force arrow from (x,y) pointing (dx,dy) with given length.
+  // label is drawn next to the arrowhead.
+  function forceArrow(x, y, dirX, dirY, len, color, label) {
+    var mag = Math.sqrt(dirX * dirX + dirY * dirY) || 1;
+    var ux = dirX / mag, uy = dirY / mag;
+    var ex = x + ux * len, ey = y + uy * len;
+    ctx.lineCap = "round";
+    // shaft
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(ex - ux * 9, ey - uy * 9);
+    ctx.stroke();
+    // arrowhead
+    var ah = 15;
+    var ang = Math.atan2(uy, ux);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - ah * Math.cos(ang - 0.45), ey - ah * Math.sin(ang - 0.45));
+    ctx.lineTo(ex - ah * Math.cos(ang + 0.45), ey - ah * Math.sin(ang + 0.45));
+    ctx.closePath();
+    ctx.fill();
+    if (label) {
+      ctx.font = "700 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var lx = ex + ux * 4, ly = ey + uy * 4;
+      // nudge label clear of the arrowhead
+      lx += (Math.abs(ux) > Math.abs(uy)) ? ux * 22 : 0;
+      ly += (Math.abs(uy) >= Math.abs(ux)) ? uy * 16 : 0;
+      ctx.fillStyle = "rgba(4,22,26,0.85)";
+      var tw = ctx.measureText(label).width;
+      roundRect(lx - tw / 2 - 6, ly - 10, tw + 12, 20, 7);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.fillText(label, lx, ly + 1);
+    }
+  }
+
+  function drawConfetti() {
+    for (var i = 0; i < confetti.length; i++) {
+      var p = confetti[i];
+      ctx.save();
+      ctx.globalAlpha = clamp(p.life, 0, 1);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
   }
 
   var spin = 0;
@@ -576,6 +663,13 @@ color: teal
     // celebration sparkle when fully lifted
     if (lift > 0.97) {
       celebrate = 0.6;
+      if (!wonOnce) {
+        wonOnce = true;
+        spawnConfetti(cx, crateTop + cs * 0.3);
+        hintEl.textContent = "Yes! The crate is all the way up!";
+      }
+    } else if (lift < 0.9) {
+      wonOnce = false;
     }
     if (celebrate > 0) {
       ctx.fillStyle = "rgba(122,240,221," + (celebrate * 0.9) + ")";
@@ -589,6 +683,26 @@ color: teal
         ctx.fill();
       }
     }
+
+    // ---- force arrows ----
+    // The crate's full weight (100 kg) pulls straight down. Anchored on the
+    // crate's right side and clamped so it never reaches the floor / meters.
+    var weightLen = clamp(cs * 0.52, 38, 78);
+    var wArrowX = cx + cs / 2 + 26;
+    if (wArrowX > W - 30) wArrowX = cx - cs / 2 - 26;
+    var wArrowY = crateTop + cs * 0.5 - weightLen / 2;
+    var wMaxBottom = L.floorY - 6;
+    if (wArrowY + weightLen > wMaxBottom) wArrowY = wMaxBottom - weightLen;
+    forceArrow(wArrowX, wArrowY, 0, 1, weightLen, "#5fb8ff", "100 kg");
+    // Your pull: only 1/n of the weight, drawn shorter, pointing down
+    // (the direction you tug the rope) just to the side of the handle so it
+    // never collides with the HUD at the top of the screen.
+    var pullKg = Math.round(100 / nPulleys);
+    var pullLen = weightLen / nPulleys;
+    var arrowX = hp.x - 40;
+    if (arrowX < 26) arrowX = hp.x + 40;
+    forceArrow(arrowX, hp.y - pullLen / 2, 0, 1, pullLen,
+      "#f4a23c", pullKg + " kg");
 
     // ---- the rope handle (drag target) ----
     var hglow = dragging ? 1 : 0.55 + 0.25 * Math.sin(time * 0.005);
@@ -634,6 +748,9 @@ color: teal
 
     // ---- meters panel (bottom-left, drawn on canvas) ----
     drawMeters(L, time);
+
+    // ---- confetti celebration (drawn last, on top of everything) ----
+    drawConfetti();
   }
 
   function drawMeters(L, time) {
@@ -665,24 +782,30 @@ color: teal
     var labelSize = clamp(W * 0.035, 12, 15);
     var valSize = clamp(W * 0.032, 11, 14);
     var effColor = force > 0.8 ? "#ff6b5e" : (force > 0.4 ? "#f4a23c" : "#2fd6c4");
+
+    // numeric readouts
+    var pullKg = Math.round(force * 100);                 // kg you pull
+    // the crate rises a fixed 3.0 m at full lift; rope pulled = lift x 3 x n
+    var crateMeters = (lift * 3).toFixed(1);              // height gained
+    var ropeMeters = (lift * 3 * ropeFactor).toFixed(1);  // rope you pulled
     var ropeFrac = clamp(lift * ropeFactor / 3, 0, 1);
 
     if (L.narrow) {
       // two meters side by side
       var colW = (panelW - 14 * 3) / 2;
-      drawMeter(px + 14, py, colW, "EFFORT",
-        force, effColor, Math.round(force * 100) + " kg", "#e6fffb",
+      drawMeter(px + 14, py, colW, "YOUR PULL",
+        force, effColor, pullKg + " kg", "#e6fffb",
         labelSize, valSize);
       drawMeter(px + 14 * 2 + colW, py, colW, "ROPE PULLED",
-        ropeFrac, "#7af0dd", "x" + nPulleys + " rope", "#04231f",
+        ropeFrac, "#7af0dd", ropeMeters + " m", "#04231f",
         labelSize, valSize);
     } else {
       // two meters stacked
-      drawMeter(px + 14, py + 4, panelW - 28, "EFFORT (your pull)",
-        force, effColor, Math.round(force * 100) + " kg pull", "#e6fffb",
+      drawMeter(px + 14, py + 4, panelW - 28, "YOUR PULL (force)",
+        force, effColor, pullKg + " kg  (lifts 100 kg)", "#e6fffb",
         labelSize, valSize);
       drawMeter(px + 14, py + panelH / 2 + 4, panelW - 28, "ROPE PULLED",
-        ropeFrac, "#7af0dd", "x" + nPulleys + " rope", "#04231f",
+        ropeFrac, "#7af0dd", ropeMeters + " m  (crate up " + crateMeters + " m)", "#04231f",
         labelSize, valSize);
     }
   }
@@ -789,6 +912,8 @@ color: teal
     lift = 0;
     liftVel = 0;
     celebrate = 0;
+    wonOnce = false;
+    confetti = [];
     hintEl.textContent = "Drag the orange rope handle down to lift the crate";
   });
 

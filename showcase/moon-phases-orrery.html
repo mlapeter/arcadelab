@@ -1,6 +1,6 @@
 <!--ARCADELAB
 title: Moon Phases Orrery
-description: A drag-the-Moon orrery — see how the Sun lights the Moon and why it looks like a crescent, half, or full Moon from Earth.
+description: A drag-the-Moon orrery — see how the Sun lights the Moon, watch the phases wax and wane, catch an eclipse, and see the Moon the way you would from Earth's backyard.
 emoji: 🌙
 color: blue
 -->
@@ -118,6 +118,25 @@ color: blue
     color: var(--muted);
     white-space: nowrap;
   }
+  #speedWrap {
+    pointer-events: auto;
+    background: var(--panel);
+    border: 1px solid rgba(125, 180, 255, 0.26);
+    border-radius: 16px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 94vw;
+    width: 460px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #speedWrap .end {
+    font-size: clamp(13px, 3.4vw, 15px);
+    color: var(--muted);
+    white-space: nowrap;
+  }
   input[type=range] {
     -webkit-appearance: none;
     appearance: none;
@@ -172,13 +191,13 @@ color: blue
     position: fixed;
     z-index: 6;
     right: clamp(10px, 2.4vw, 18px);
-    bottom: calc(clamp(10px, 2.4vw, 18px) + 132px);
+    bottom: calc(clamp(10px, 2.4vw, 18px) + 208px);
   }
   #howPanel {
     position: fixed;
     z-index: 7;
     right: clamp(10px, 2.4vw, 18px);
-    bottom: calc(clamp(10px, 2.4vw, 18px) + 184px);
+    bottom: calc(clamp(10px, 2.4vw, 18px) + 260px);
     width: min(320px, 90vw);
     background: var(--panel);
     border: 1px solid rgba(125, 180, 255, 0.34);
@@ -219,7 +238,9 @@ color: blue
   <h3>🌙 How it works</h3>
   <p>The Sun's light only ever lights up <b>half</b> of the Moon.</p>
   <p>As the Moon orbits Earth, we see different amounts of that lit half — that makes the phases.</p>
-  <p>Drag the Moon or move the slider. The little circle shows what you'd see from Earth!</p>
+  <p><b>Waxing</b> means the bright part is growing. <b>Waning</b> means it's shrinking.</p>
+  <p>When the Sun, Earth and Moon line up you get an <b>eclipse</b>! 🌑</p>
+  <p>Drag the Moon or use the sliders — one moves the Moon, one sets the orbit speed. The circle shows what you'd see from Earth!</p>
 </div>
 
 <div id="dock">
@@ -228,6 +249,11 @@ color: blue
     <span class="end">🌑 New</span>
     <input id="orbit" type="range" min="0" max="1000" value="125" aria-label="Moon position">
     <span class="end">Full 🌕</span>
+  </div>
+  <div id="speedWrap">
+    <span class="end">🐢 Slow</span>
+    <input id="speed" type="range" min="0" max="100" value="40" aria-label="Orbit speed">
+    <span class="end">Fast 🚀</span>
   </div>
 </div>
 
@@ -241,6 +267,7 @@ color: blue
   if (!ctx) return;
 
   var slider = document.getElementById("orbit");
+  var speedSlider = document.getElementById("speed");
   var playBtn = document.getElementById("play");
   var resetBtn = document.getElementById("reset");
   var howBtn = document.getElementById("howBtn");
@@ -255,7 +282,14 @@ color: blue
   var SLIDER_MAX = 1000;
   var angle = (parseFloat(slider.value) / SLIDER_MAX) * Math.PI * 2;
   var playing = true;
-  var SPEED = 0.28; // radians per second when auto-playing
+  // orbit speed in radians/second, set by the speed slider (0..100 -> 0.05..0.95)
+  var SPEED = 0.28;
+  function speedFromSlider() {
+    var v = parseFloat(speedSlider.value);
+    if (isNaN(v)) v = 40;
+    return 0.05 + (v / 100) * 0.9;
+  }
+  SPEED = speedFromSlider();
   var dragging = false;
   var dragPointerId = null;
 
@@ -323,7 +357,24 @@ color: blue
     else name = "Waning Crescent";
     // waxing = first half of cycle (lit side grows)
     var waxing = t < Math.PI;
-    return { illum: illum, name: name, waxing: waxing, t: t };
+    // eclipse: Sun-Earth-Moon (almost) in a line.
+    // near angle 0 -> Moon between Sun & Earth -> Solar eclipse
+    // near angle PI -> Earth between Sun & Moon -> Lunar eclipse
+    var ECL = 0.13; // radians of tolerance (~7.5 degrees)
+    var eclipse = null, eclipseStrength = 0;
+    var dNew = Math.min(t, Math.PI * 2 - t);   // distance from New Moon
+    var dFull = Math.abs(t - Math.PI);          // distance from Full Moon
+    if (dNew < ECL) {
+      eclipse = "solar";
+      eclipseStrength = 1 - dNew / ECL;
+    } else if (dFull < ECL) {
+      eclipse = "lunar";
+      eclipseStrength = 1 - dFull / ECL;
+    }
+    return {
+      illum: illum, name: name, waxing: waxing, t: t,
+      eclipse: eclipse, eclipseStrength: eclipseStrength
+    };
   }
 
   // Draw the Moon-as-seen-from-Earth into a circle.
@@ -470,9 +521,24 @@ color: blue
     // sunlight direction arrow near moon (toward where light comes from)
     // (kept subtle)
 
-    // ---- inset: Moon as seen from Earth ----
     var ph = phaseInfo(angle);
-    drawInset(ph, time);
+
+    // ---- eclipse alignment beam (Sun -> Earth -> Moon all in a row) ----
+    if (ph.eclipse) {
+      var beamPulse = 0.45 + 0.35 * Math.sin(time * 0.006);
+      ctx.save();
+      ctx.globalAlpha = ph.eclipseStrength * beamPulse;
+      var beamCol = ph.eclipse === "solar" ? "#ffd166" : "#c79bff";
+      ctx.strokeStyle = beamCol;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([10, 8]);
+      ctx.beginPath();
+      ctx.moveTo(sunX, sunY);
+      ctx.lineTo(W, sunY); // the Sun-Earth-Moon line runs straight across
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
 
     // connecting glow line Earth->Moon
     ctx.save();
@@ -484,6 +550,12 @@ color: blue
     ctx.lineTo(mx, my);
     ctx.stroke();
     ctx.restore();
+
+    // ---- inset: Moon as seen from Earth ----
+    drawInset(ph, time);
+
+    // ---- eclipse celebration banner (drawn last, on top) ----
+    drawEclipseBanner(ph, time);
   }
 
   // draws a lit/dark world (Earth or Moon). Light comes from the left (Sun).
@@ -563,9 +635,10 @@ color: blue
     var size = clamp(96, Math.min(W, H) * 0.26, 180);
     var ix = pad;
     var iy = clamp(70, H * 0.16, 110);
+    var panelH = size + 58; // extra room for the waxing/waning line
 
     // panel
-    roundRect(ix, iy, size, size + 38, 16);
+    roundRect(ix, iy, size, panelH, 16);
     ctx.fillStyle = "rgba(18,26,52,0.9)";
     ctx.fill();
     ctx.strokeStyle = "rgba(125,180,255,0.34)";
@@ -579,9 +652,9 @@ color: blue
     ctx.fillText("From Earth you see", ix + size / 2, iy + clamp(16, size * 0.16, 22));
 
     // the moon disk
-    var mr = size * 0.32;
+    var mr = size * 0.30;
     var mcx = ix + size / 2;
-    var mcy = iy + size * 0.52;
+    var mcy = iy + size * 0.50;
     // soft glow behind
     var gl = ctx.createRadialGradient(mcx, mcy, 0, mcx, mcy, mr * 2);
     gl.addColorStop(0, "rgba(255,240,190," + (0.15 + ph.illum * 0.4) + ")");
@@ -596,8 +669,64 @@ color: blue
     // phase name
     ctx.fillStyle = "#ffd166";
     ctx.font = "700 " + clamp(14, size * 0.155, 19) + "px system-ui, sans-serif";
-    ctx.fillText(ph.name, ix + size / 2, iy + size + 22);
+    ctx.fillText(ph.name, ix + size / 2, iy + size + 14);
+
+    // waxing / waning sub-label (skip at the exact New/Full points)
+    var isQuarterPoint = (ph.name === "New Moon" || ph.name === "Full Moon");
+    if (!isQuarterPoint) {
+      ctx.fillStyle = "#9fb2da";
+      ctx.font = "600 " + clamp(11, size * 0.115, 14) + "px system-ui, sans-serif";
+      var wText = ph.waxing ? "▶ Waxing (getting bigger)" : "◀ Waning (getting smaller)";
+      ctx.fillText(wText, ix + size / 2, iy + size + 36);
+    }
     ctx.textAlign = "left";
+  }
+
+  // big celebratory banner shown when an eclipse lines up
+  function drawEclipseBanner(ph, time) {
+    if (!ph.eclipse) return;
+    var s = ph.eclipseStrength; // 0..1
+    var pulse = 0.7 + 0.3 * Math.sin(time * 0.006);
+    var isSolar = ph.eclipse === "solar";
+    var msg = isSolar ? "☀️ Solar Eclipse! ☀️" : "🌑 Lunar Eclipse! 🌑";
+    var sub = isSolar
+      ? "The Moon blocks the Sun"
+      : "Earth's shadow hides the Moon";
+
+    var fontSize = clamp(18, W * 0.052, 34);
+    ctx.save();
+    ctx.font = "800 " + fontSize + "px system-ui, sans-serif";
+    var tw = ctx.measureText(msg).width;
+    ctx.font = "600 " + (fontSize * 0.62) + "px system-ui, sans-serif";
+    var sw = ctx.measureText(sub).width;
+    var boxW = Math.min(W - 24, Math.max(tw, sw) + 48);
+    var boxH = fontSize * 2.5;
+    var bx = (W - boxW) / 2;
+    // sit below the "From Earth" inset so the two never overlap
+    var insetSize = clamp(96, Math.min(W, H) * 0.26, 180);
+    var insetBottom = clamp(70, H * 0.16, 110) + insetSize + 58;
+    var by = insetBottom + clamp(10, H * 0.02, 20);
+
+    ctx.globalAlpha = Math.min(1, s * 1.4);
+    roundRect(bx, by, boxW, boxH, 18);
+    var bg = isSolar ? "rgba(70,48,12,0.94)" : "rgba(36,22,52,0.94)";
+    ctx.fillStyle = bg;
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = isSolar
+      ? "rgba(255,210,90," + pulse + ")"
+      : "rgba(190,150,255," + pulse + ")";
+    ctx.stroke();
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = isSolar ? "#ffd166" : "#d9b8ff";
+    ctx.font = "800 " + fontSize + "px system-ui, sans-serif";
+    ctx.fillText(msg, W / 2, by + fontSize * 1.0);
+    ctx.fillStyle = "#eaf1ff";
+    ctx.font = "600 " + (fontSize * 0.62) + "px system-ui, sans-serif";
+    ctx.fillText(sub, W / 2, by + fontSize * 1.85);
+    ctx.textAlign = "left";
+    ctx.restore();
   }
 
   // ---- small helpers ----
@@ -706,9 +835,13 @@ color: blue
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
 
-  // ---- slider ----
+  // ---- sliders ----
   slider.addEventListener("input", function () {
     angle = (parseFloat(slider.value) / SLIDER_MAX) * Math.PI * 2;
+  });
+
+  speedSlider.addEventListener("input", function () {
+    SPEED = speedFromSlider();
   });
 
   // ---- buttons ----

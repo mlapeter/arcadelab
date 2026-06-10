@@ -217,7 +217,7 @@ export default async function PlayPage({ params }: Props) {
 
       {/* Game header — title + creator on one line */}
       <div className="mb-2 flex items-baseline gap-3 flex-wrap">
-        <h1 className="text-sm sm:text-base text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
+        <h1 dir="auto" className="text-sm sm:text-base text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
           {game.title}
         </h1>
         <CreatorBadge name={game.creator_name} />
@@ -266,7 +266,7 @@ export default async function PlayPage({ params }: Props) {
           on-page for AI crawlers and SEO snippet extraction. */}
       {override?.longDescription && (
         <section className="mt-6 rpg-panel p-5">
-          <p className="text-[11px] text-wood-mid leading-relaxed normal-case">
+          <p dir="auto" className="text-[11px] text-wood-mid leading-relaxed normal-case">
             {override.longDescription}
           </p>
         </section>

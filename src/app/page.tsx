@@ -9,6 +9,16 @@ import {
   faqPageSchema,
 } from "@/lib/schema";
 
+/** Look up creator display names for a set of creator ids. */
+async function getCreatorNames(creatorIds: string[]): Promise<Record<string, string>> {
+  if (creatorIds.length === 0) return {};
+  const { data: creators } = await supabase
+    .from("creators")
+    .select("id, display_name")
+    .in("id", creatorIds);
+  return creators ? Object.fromEntries(creators.map((c) => [c.id, c.display_name])) : {};
+}
+
 /**
  * Featured showcase games for the homepage. Slugs come from the curated
  * overrides in game-overrides.ts (getFeaturedGameSlugs). We fetch the live
@@ -27,17 +37,7 @@ async function getFeaturedGames() {
 
   if (!games || games.length === 0) return [];
 
-  const creatorIds = [...new Set(games.map((g) => g.creator_id).filter(Boolean))];
-  let creatorsMap: Record<string, string> = {};
-  if (creatorIds.length > 0) {
-    const { data: creators } = await supabase
-      .from("creators")
-      .select("id, display_name")
-      .in("id", creatorIds);
-    if (creators) {
-      creatorsMap = Object.fromEntries(creators.map((c) => [c.id, c.display_name]));
-    }
-  }
+  const creatorsMap = await getCreatorNames([...new Set(games.map((g) => g.creator_id).filter(Boolean))]);
 
   const order = new Map(slugs.map((s, i) => [s, i]));
   return games
@@ -45,6 +45,7 @@ async function getFeaturedGames() {
       id: g.id,
       slug: g.slug,
       title: g.title,
+      creator_id: g.creator_id,
       creator_name: creatorsMap[g.creator_id] || "Unknown",
       play_count: g.play_count,
       like_count: g.like_count,
@@ -54,6 +55,37 @@ async function getFeaturedGames() {
       preview_url: g.preview_url,
     }))
     .sort((a, b) => (order.get(a.slug) ?? 0) - (order.get(b.slug) ?? 0));
+}
+
+/**
+ * Top community games for the homepage — the most-played active games that
+ * aren't part of the first-party Featured showcase. We exclude both the
+ * featured slugs and the featured games' creators (those are our own demo
+ * accounts) so this section is genuinely from the community.
+ */
+async function getCommunityGames(featuredGames: Awaited<ReturnType<typeof getFeaturedGames>>) {
+  const excludeSlugs = [...new Set([...getFeaturedGameSlugs(), ...featuredGames.map((g) => g.slug)])];
+  const excludeCreatorIds = [...new Set(featuredGames.map((g) => g.creator_id).filter(Boolean))];
+
+  let query = supabase
+    .from("games")
+    .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url")
+    .eq("status", "active")
+    .order("play_count", { ascending: false })
+    .order("like_count", { ascending: false })
+    .limit(8);
+  if (excludeSlugs.length > 0) query = query.not("slug", "in", `(${excludeSlugs.join(",")})`);
+  if (excludeCreatorIds.length > 0) query = query.not("creator_id", "in", `(${excludeCreatorIds.join(",")})`);
+
+  const { data: games } = await query;
+  if (!games || games.length === 0) return [];
+
+  const creatorsMap = await getCreatorNames([...new Set(games.map((g) => g.creator_id).filter(Boolean))]);
+
+  return games.map((g) => ({
+    ...g,
+    creator_name: creatorsMap[g.creator_id] || "Unknown",
+  }));
 }
 
 const HOMEPAGE_FAQS = [
@@ -111,6 +143,7 @@ const HOMEPAGE_FAQS = [
 
 export default async function Home() {
   const featuredGames = await getFeaturedGames();
+  const communityGames = await getCommunityGames(featuredGames);
 
   return (
     <main className="relative min-h-[calc(100vh-56px)] flex flex-col items-center justify-center px-4 overflow-hidden">
@@ -293,6 +326,45 @@ color: blue
           </p>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {featuredGames.map((game) => (
+              <GameCard
+                key={game.id}
+                slug={game.slug}
+                title={game.title}
+                creatorName={game.creator_name}
+                playCount={game.play_count}
+                likeCount={game.like_count}
+                emoji={game.emoji}
+                color={game.color}
+                thumbnailUrl={game.thumbnail_url}
+                previewUrl={game.preview_url}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Top community games */}
+      {communityGames.length > 0 && (
+        <section
+          className="mt-14 mb-8 w-full max-w-5xl relative z-[1]"
+          aria-label="Top community games on ArcadeLab"
+        >
+          <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+            <h2 className="text-xs sm:text-sm text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
+              🌍 From the Community
+            </h2>
+            <Link
+              href="/play"
+              className="text-[10px] text-parchment/70 hover:text-accent-gold transition-colors normal-case"
+            >
+              See all games →
+            </Link>
+          </div>
+          <p className="text-[10px] text-parchment/60 normal-case mb-5 leading-relaxed">
+            The most-played games from creators around the world — your game could be here next!
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+            {communityGames.map((game) => (
               <GameCard
                 key={game.id}
                 slug={game.slug}

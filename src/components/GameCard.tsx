@@ -136,7 +136,7 @@ export default function GameCard({
 
         {/* Info area on parchment */}
         <div className="p-3">
-          <h3 className="truncate text-[10px] text-wood-dark leading-relaxed">{title}</h3>
+          <h3 dir="auto" className="truncate text-[10px] text-wood-dark leading-relaxed">{title}</h3>
           <p className="mt-1 text-[10px] text-wood-mid/70 normal-case">
             by {creatorName}
           </p>

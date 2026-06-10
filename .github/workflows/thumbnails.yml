@@ -6,8 +6,10 @@ name: Game thumbnails
 
 on:
   schedule:
-    # Daily at 06:00 UTC (just after midnight Mountain) — low-traffic window.
-    - cron: "0 6 * * *"
+    # Every 6 hours — at 200+ games and growing, new publishes should get
+    # their thumbnail the same day, not the next. The script is incremental
+    # (only games missing media), so off-peak runs finish in seconds.
+    - cron: "0 0,6,12,18 * * *"
   workflow_dispatch: # allow manual runs from the Actions tab
 
 # Don't let a slow run overlap the next scheduled one.

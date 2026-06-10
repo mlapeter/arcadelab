@@ -19,7 +19,7 @@ export async function authenticateCreator(authHeader: string | null) {
 
   const { data } = await supabase
     .from("creators")
-    .select("id, display_name")
+    .select("id, display_name, trust")
     .eq("api_token", hashed)
     .single();
 

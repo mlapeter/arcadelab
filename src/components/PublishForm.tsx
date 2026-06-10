@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { parseGameHeader, type ParsedGame } from "@/lib/parse-game";
+import { isCreatorCodeMessage } from "@/lib/safety";
 import { getCreatorIdentity, saveCreatorIdentity, type CreatorIdentity } from "@/lib/identity";
 
 type Phase = "paste" | "welcome" | "confirm" | "success";
@@ -10,6 +11,9 @@ interface PublishResult {
   url: string;
   slug: string;
   title: string;
+  /** Server merged this publish into a recent game with the same title. */
+  updated?: boolean;
+  message?: string;
 }
 
 export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: string; remixOfSlug?: string }) {
@@ -113,6 +117,16 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
   }, [remixOfSlug]);
 
   function handlePaste(code: string) {
+    // A pasted creator-code message must never be echoed into the preview.
+    if (isCreatorCodeMessage(code)) {
+      setRawCode("");
+      setParsed(null);
+      setError(
+        "That looks like your creator code message — keep it private! It's how you publish. Paste your game's HTML code here instead."
+      );
+      return;
+    }
+
     setRawCode(code);
     if (!code.trim()) {
       setParsed(null);
@@ -252,6 +266,8 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
         url: data.url,
         slug: data.slug,
         title: data.title,
+        updated: data.updated,
+        message: data.message,
       });
       setPhase("success");
     } catch {
@@ -585,10 +601,15 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       <div className="mx-auto max-w-lg space-y-6 text-center">
         <div className="text-5xl">🎉</div>
         <h2 className="text-sm sm:text-base text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
-          {updateSlug ? "Game updated!" : "Nice! Your game is live!"}
+          {updateSlug || publishResult.updated ? "Game updated!" : "Nice! Your game is live!"}
         </h2>
+        {publishResult.message && (
+          <p className="text-[10px] text-parchment/60 normal-case">{publishResult.message}</p>
+        )}
         <p className="text-[10px] text-parchment/60">
-          {updateSlug ? "Your changes are live now:" : "Share this link with friends:"}
+          {updateSlug || publishResult.updated
+            ? "Your changes are live now:"
+            : "Share this link with friends:"}
         </p>
 
         <div className="rpg-panel p-3 flex items-center gap-2">

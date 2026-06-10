@@ -2,7 +2,14 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { authenticateCreator } from "@/lib/auth";
 import { generateSlug } from "@/lib/slug";
-import { scanGameContent, MAX_HTML_SIZE, MAX_TITLE_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/safety";
+import {
+  scanGameContent,
+  isCreatorCodeMessage,
+  explainNotHtml,
+  MAX_HTML_SIZE,
+  MAX_TITLE_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+} from "@/lib/safety";
 import { moderateContent, applyModeration } from "@/lib/moderation";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
 import { VALID_COLORS, type GameColor } from "@/lib/parse-game";
@@ -14,6 +21,7 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
   const sort = searchParams.get("sort") || "newest";
+  const q = (searchParams.get("q") || "").trim().slice(0, 100);
   const offset = (page - 1) * limit;
 
   let orderColumn = "created_at";
@@ -21,12 +29,23 @@ export async function GET(request: NextRequest) {
   if (sort === "liked") orderColumn = "like_count";
   if (sort === "best") orderColumn = "quality_score";
 
-  const { data: games, error, count } = await supabase
+  let query = supabase
     .from("games")
     .select("id, slug, title, description, creator_id, libraries, play_count, like_count, emoji, color, thumbnail_url, preview_url, created_at", { count: "exact" })
-    .eq("status", "active")
-    .order(orderColumn, { ascending: false })
-    .range(offset, offset + limit - 1);
+    .eq("status", "active");
+
+  if (q) {
+    // Escape ilike wildcards so a kid typing "100%" searches literally.
+    query = query.ilike("title", `%${q.replace(/[%_\\]/g, "\\$&")}%`);
+  }
+
+  query = query.order(orderColumn, { ascending: false });
+  if (orderColumn !== "created_at") {
+    // Stable tiebreaker so pagination never skips or repeats games.
+    query = query.order("created_at", { ascending: false });
+  }
+
+  const { data: games, error, count } = await query.range(offset, offset + limit - 1);
 
   if (error) {
     return NextResponse.json({ error: "Failed to fetch games" }, { status: 500 });
@@ -60,6 +79,38 @@ export async function GET(request: NextRequest) {
   });
 }
 
+// --- Rapid-duplicate detection ---
+// A kid (or their AI) re-submitting the same title within minutes is a retry,
+// not a new game — we update the existing game instead of creating a twin.
+
+const normalizeTitle = (t: string) =>
+  t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+function editDistance(a: string, b: string): number {
+  let row = Array.from({ length: a.length + 1 }, (_, i) => i);
+  for (let j = 1; j <= b.length; j++) {
+    const next = [j];
+    for (let i = 1; i <= a.length; i++) {
+      next[i] = Math.min(
+        row[i] + 1,
+        next[i - 1] + 1,
+        row[i - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    row = next;
+  }
+  return row[a.length];
+}
+
+/** Same or near-same title: case/punctuation-insensitive, tiny typos allowed. */
+function isNearSameTitle(a: string, b: string): boolean {
+  const na = normalizeTitle(a);
+  const nb = normalizeTitle(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  return na.length > 4 && nb.length > 4 && editDistance(na, nb) <= 2;
+}
+
 export async function POST(request: NextRequest) {
   const clientIp = getClientIp(request);
   if (!rateLimit(clientIp)) {
@@ -83,17 +134,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     let creatorId = creator?.id;
     let creatorName = creator?.display_name;
+    let creatorTrust = creator?.trust;
 
     if (!creatorId && body.creator_code) {
       const { data } = await supabase
         .from("creators")
-        .select("id, display_name")
+        .select("id, display_name, trust")
         .eq("creator_code", body.creator_code)
         .single();
 
       if (data) {
         creatorId = data.id;
         creatorName = data.display_name;
+        creatorTrust = data.trust;
       }
     }
 
@@ -101,6 +154,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Invalid credentials" },
         { status: 401 }
+      );
+    }
+
+    // Banned creators can't publish. Neutral message — no need to advertise it.
+    if (creatorTrust === "banned") {
+      return NextResponse.json(
+        { error: "Publishing isn't available for this account." },
+        { status: 403 }
       );
     }
 
@@ -155,6 +216,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A pasted creator-code message isn't a game — and must never be echoed back.
+    if (isCreatorCodeMessage(html)) {
+      return NextResponse.json(
+        {
+          error:
+            "That looks like your creator code message — keep it private! It's how you publish. Paste your game's HTML code here instead.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Not HTML at all (Python, a bare JS module, plain text...) — explain kindly.
+    const notHtml = explainNotHtml(html);
+    if (notHtml) {
+      return NextResponse.json({ error: notHtml }, { status: 400 });
+    }
+
     // Safety scan
     const scanResult = scanGameContent(html);
     if (!scanResult.safe) {
@@ -165,6 +243,58 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    const contentHash = crypto.createHash("sha256").update(html).digest("hex");
+
+    // Same creator + same/near-same title in the last 15 minutes → treat as an
+    // update to that game, not a new one. (Skipped for the default "Untitled
+    // Game" title — two quick untitled experiments shouldn't merge.)
+    if (title !== "Untitled Game") {
+      const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      const { data: recent } = await supabase
+        .from("games")
+        .select("id, slug, title")
+        .eq("creator_id", creatorId)
+        .eq("status", "active")
+        .gte("created_at", fifteenMinAgo);
+
+      const existing = (recent || []).find((g) => isNearSameTitle(g.title, title));
+      if (existing) {
+        await supabase
+          .from("game_content")
+          .update({ html, content_hash: contentHash })
+          .eq("game_id", existing.id);
+        await supabase
+          .from("games")
+          .update({
+            title,
+            description,
+            libraries,
+            emoji,
+            color,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id);
+
+        after(async () => {
+          const result = await moderateContent({ title, description, html, emoji });
+          if (result) await applyModeration(existing.id, result);
+        });
+
+        return NextResponse.json(
+          {
+            id: existing.id,
+            slug: existing.slug,
+            url: `https://arcadelab.ai/play/${existing.slug}`,
+            title,
+            creator: creatorName,
+            updated: true,
+            message: `You published "${existing.title}" a few minutes ago, so we updated that game instead of making a copy.`,
+          },
+          { status: 200 }
+        );
+      }
     }
 
     // Generate unique slug
@@ -178,11 +308,6 @@ export async function POST(request: NextRequest) {
     if (existingSlug) {
       slug = `${slug}-${Date.now().toString(36)}`;
     }
-
-    const contentHash = crypto
-      .createHash("sha256")
-      .update(html)
-      .digest("hex");
 
     // Insert game
     const { data: game, error: gameError } = await supabase
@@ -231,7 +356,7 @@ export async function POST(request: NextRequest) {
     // AI moderation runs after the response is sent — publishing stays
     // instant. A non-"safe" verdict auto-shadow-hides the game for review.
     after(async () => {
-      const result = await moderateContent({ title, description, html });
+      const result = await moderateContent({ title, description, html, emoji });
       if (result) await applyModeration(game.id, result);
     });
 

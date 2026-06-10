@@ -67,6 +67,11 @@ const FOR_AI_FAQS = [
     answer:
       "Tell them: 'Your game is ready! Copy all the code above, then go to arcadelab.ai/publish and paste it in.'",
   },
+  {
+    question: "Why was a publish rejected, and what should I do?",
+    answer:
+      "ArcadeLab rejects three kinds of pastes with a friendly message: (1) a creator-code message pasted instead of game code — keep the code private and paste the game HTML; (2) non-HTML code like Python/pygame or a bare JS module — convert it to one self-contained HTML file first; (3) publishing the same title twice within 15 minutes — that's not an error: ArcadeLab updates the existing game instead of creating a duplicate, and the response says so.",
+  },
 ];
 
 async function getJamTheme() {
@@ -323,6 +328,25 @@ remix_of: [original-game-slug, if this is a remix]
           the code to study it or use it as a starting point. AI assistants can
           fetch this page to read a game&apos;s source code directly.
         </p>
+
+        <h2 className="text-[10px] text-wood-dark mb-3">Why might a publish be rejected?</h2>
+        <ul className="text-[10px] leading-loose text-wood-mid space-y-1 mb-6 list-inside list-disc normal-case">
+          <li>
+            <strong>A creator-code message was pasted instead of a game.</strong> If the paste looks like
+            &quot;My ArcadeLab creator code is ...&quot;, ArcadeLab rejects it so the code isn&apos;t published.
+            Keep the creator&apos;s code private and paste the game&apos;s HTML instead.
+          </li>
+          <li>
+            <strong>The paste isn&apos;t HTML.</strong> Python/pygame, a bare JavaScript module, or plain text
+            can&apos;t run in a browser. Convert it to one self-contained HTML file (inline &lt;script&gt; and
+            &lt;style&gt;, drawing to the page or a &lt;canvas&gt;) and paste that.
+          </li>
+          <li>
+            <strong>Same title published twice within 15 minutes.</strong> Not actually a rejection — ArcadeLab
+            treats it as a retry and updates the existing game instead of creating a duplicate. The JSON response
+            includes <code className="text-accent-purple">updated: true</code> and the same URL.
+          </li>
+        </ul>
 
         <h2 className="text-[10px] text-wood-dark mb-3">What should I tell the creator after generating the code?</h2>
         <p className="text-[10px] text-wood-mid normal-case">

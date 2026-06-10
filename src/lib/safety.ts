@@ -180,3 +180,58 @@ export function detectInfiniteLoops(html: string): string[] {
 export const MAX_HTML_SIZE = 500 * 1024; // 500 KB
 export const MAX_TITLE_LENGTH = 60;
 export const MAX_DESCRIPTION_LENGTH = 280;
+
+// --- "That's not a game" detection ---
+// The paste box receives things that aren't games: a kid pasting back their
+// creator-code reminder message, or code in a language browsers can't run.
+// Both deserve a friendly pointer instead of a confusing failure. Used by
+// both the publish form (client) and the API (server) — keep these pure.
+
+/** Does the text contain anything that looks like a real HTML tag? */
+function looksLikeHtml(text: string): boolean {
+  return /<\s*(!doctype|html|head|body|script|style|canvas|div|svg|main|section|h[1-6]|p|button|img|a)\b/i.test(
+    text
+  );
+}
+
+/** Strip the ARCADELAB/KIDHUBB metadata header so only the game code is judged. */
+function withoutHeader(text: string): string {
+  return text.replace(/<!--\s*(ARCADELAB|KIDHUBB)[\s\S]*?-->/i, "").trim();
+}
+
+/**
+ * A pasted creator-code message ("My ArcadeLab creator code is WORD-WORD-WORD-12...")
+ * instead of game code. The message must never be echoed back or published.
+ */
+export function isCreatorCodeMessage(text: string): boolean {
+  return (
+    !looksLikeHtml(text) &&
+    /creator\s+code[\s\S]{0,40}?\b[A-Z]+-[A-Z]+-[A-Z]+-\d+\b/i.test(text)
+  );
+}
+
+/**
+ * If the paste isn't HTML at all (pygame, a bare JS module, plain text...),
+ * returns an encouraging explanation an AI assistant can act on. Returns null
+ * when the content looks like an HTML document.
+ */
+export function explainNotHtml(text: string): string | null {
+  const code = withoutHeader(text);
+  if (looksLikeHtml(code)) return null;
+
+  const intro =
+    "ArcadeLab runs single-file HTML games: one .html file with the JavaScript in <script> tags and CSS in <style> tags, drawing to the page or a <canvas>.";
+  const outro =
+    "Ask your AI assistant to convert it into one complete HTML file, then paste that here — you're close!";
+
+  if (/\bimport\s+pygame\b|\bpygame\./.test(code)) {
+    return `This looks like Python (pygame) — awesome start! Browsers can't run Python, though. ${intro} ${outro}`;
+  }
+  if (/^\s*(import\s+\w|from\s+\w+\s+import)\b/m.test(code) && /\bdef\s+\w+\s*\(/.test(code)) {
+    return `This looks like Python code — nice work! Browsers can't run Python directly. ${intro} ${outro}`;
+  }
+  if (/^\s*(import\s+.+from\s+['"]|export\s+(default|const|function))/m.test(code)) {
+    return `This looks like a JavaScript module, but ArcadeLab needs everything in one HTML file. ${intro} Put your JavaScript inside a <script> tag in the HTML (no import/export). ${outro}`;
+  }
+  return `Hmm, this doesn't look like HTML game code yet. ${intro} ${outro}`;
+}

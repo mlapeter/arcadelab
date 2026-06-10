@@ -46,3 +46,6 @@ MARKETING.backup-*.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# goal notes (local only)
+GOAL_NOTES.md

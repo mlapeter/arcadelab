@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { authenticateCreator } from "@/lib/auth";
-import { scanGameContent, MAX_HTML_SIZE, MAX_TITLE_LENGTH, MAX_DESCRIPTION_LENGTH } from "@/lib/safety";
+import {
+  scanGameContent,
+  isCreatorCodeMessage,
+  explainNotHtml,
+  MAX_HTML_SIZE,
+  MAX_TITLE_LENGTH,
+  MAX_DESCRIPTION_LENGTH,
+} from "@/lib/safety";
 import { moderateContent, applyModeration } from "@/lib/moderation";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
 import { VALID_COLORS, type GameColor } from "@/lib/parse-game";
@@ -53,19 +60,31 @@ export async function PUT(
 
     const body = await request.json();
     let creatorId = creator?.id;
+    let creatorTrust = creator?.trust;
 
     if (!creatorId && body.creator_code) {
       const { data } = await supabase
         .from("creators")
-        .select("id")
+        .select("id, trust")
         .eq("creator_code", body.creator_code)
         .single();
 
-      if (data) creatorId = data.id;
+      if (data) {
+        creatorId = data.id;
+        creatorTrust = data.trust;
+      }
     }
 
     if (!creatorId) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    }
+
+    // Banned creators can't publish updates either. Neutral message.
+    if (creatorTrust === "banned") {
+      return NextResponse.json(
+        { error: "Publishing isn't available for this account." },
+        { status: 403 }
+      );
     }
 
     // Verify game exists and creator owns it
@@ -90,6 +109,21 @@ export async function PUT(
 
     if (new TextEncoder().encode(html).length > MAX_HTML_SIZE) {
       return NextResponse.json({ error: "Game code is too large (max 500KB)" }, { status: 400 });
+    }
+
+    // Same friendly guards as publish: no creator-code messages, no non-HTML.
+    if (isCreatorCodeMessage(html)) {
+      return NextResponse.json(
+        {
+          error:
+            "That looks like your creator code message — keep it private! It's how you publish. Paste your game's HTML code here instead.",
+        },
+        { status: 400 }
+      );
+    }
+    const notHtml = explainNotHtml(html);
+    if (notHtml) {
+      return NextResponse.json({ error: notHtml }, { status: 400 });
     }
 
     const title = body.title?.trim() || undefined;
@@ -154,6 +188,7 @@ export async function PUT(
         title: updatedGame.title,
         description: description ?? null,
         html,
+        emoji: emoji ?? null,
       });
       if (result) await applyModeration(game.id, result);
     });

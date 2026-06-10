@@ -19,12 +19,16 @@ export interface ModerationResult {
   quality: "broken" | "basic" | "good";
   confidence: number; // 0..1
   note: string;
+  /** Fallbacks generated when the creator left these blank (same Haiku call). */
+  description?: string;
+  emoji?: string;
 }
 
 interface ModerationInput {
   title: string;
   description: string | null;
   html: string;
+  emoji?: string | null;
 }
 
 const SYSTEM_PROMPT = `You are a content moderator for ArcadeLab, a site where anyone — including kids — publishes single-file HTML games, visualizations, and interactive experiments. Your job is to catch genuinely harmful or deceptive submissions, not to judge skill.
@@ -59,9 +63,22 @@ export async function moderateContent(
       ? input.html.slice(0, MAX_HTML_CHARS) + "\n…(truncated)"
       : input.html;
 
+  // When the creator left description/emoji blank, the same call generates
+  // kid-friendly fallbacks — one API call, not two.
+  const extras: string[] = [];
+  if (!input.description) {
+    extras.push(
+      'The creator left the description blank. Also include a "description" field: one kid-friendly sentence (under 100 characters) telling players what they get to do.'
+    );
+  }
+  if (!input.emoji) {
+    extras.push('Also include an "emoji" field: one single emoji that fits the game.');
+  }
+
   const userMessage = [
     `Title: ${input.title}`,
     `Description: ${input.description || "(none)"}`,
+    ...(extras.length ? ["", ...extras] : []),
     "",
     "HTML:",
     html,
@@ -111,12 +128,19 @@ function parseResult(text: string): ModerationResult | null {
       typeof raw.confidence === "number"
         ? Math.min(1, Math.max(0, raw.confidence))
         : 0.5;
-    return {
+    const result: ModerationResult = {
       verdict,
       quality,
       confidence,
       note: typeof raw.note === "string" ? raw.note.slice(0, 200) : "",
     };
+    if (typeof raw.description === "string" && raw.description.trim()) {
+      result.description = raw.description.trim().slice(0, 150);
+    }
+    if (typeof raw.emoji === "string" && raw.emoji.trim()) {
+      result.emoji = [...raw.emoji.trim()].slice(0, 2).join(""); // one emoji (may be 2 code points)
+    }
+    return result;
   } catch {
     return null;
   }
@@ -148,6 +172,22 @@ export async function applyModeration(gameId: string, result: ModerationResult) 
       quality_score: QUALITY_BASE[result.quality] ?? 1,
     })
     .eq("id", gameId);
+
+  // AI-generated fallbacks only ever fill blanks — never overwrite a creator's words.
+  if (result.description) {
+    await supabase
+      .from("games")
+      .update({ description: result.description })
+      .eq("id", gameId)
+      .is("description", null);
+  }
+  if (result.emoji) {
+    await supabase
+      .from("games")
+      .update({ emoji: result.emoji })
+      .eq("id", gameId)
+      .is("emoji", null);
+  }
 
   if (result.verdict === "safe") return;
 

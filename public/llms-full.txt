@@ -49,6 +49,13 @@ ArcadeLab hosts single-file HTML interactive content. The original use case was 
 6. Click Publish. First-time publishers receive a Creator Code automatically.
 7. The content is live at `https://arcadelab.ai/play/{slug}`. Share that URL.
 
+### Publish guardrails
+
+- **Creator-code messages are rejected.** If the paste looks like "My ArcadeLab creator code is ..." instead of game code, ArcadeLab refuses it so the code isn't published. Keep the creator's code private and paste the game's HTML instead.
+- **Non-HTML pastes are rejected with a hint.** Python/pygame, bare JavaScript modules (import/export), or plain text can't run in a browser. Convert the game to one self-contained HTML file — JavaScript in `<script>` tags, CSS in `<style>` tags, drawing to the page or a `<canvas>` — then paste that.
+- **Rapid duplicates become updates.** Publishing the same (or nearly the same) title twice within 15 minutes updates the existing game instead of creating a duplicate. The JSON response includes `updated: true` and the same play URL — so retrying a publish is always safe.
+- Banned accounts receive a neutral "publishing isn't available" error.
+
 ## The ARCADELAB header format
 
 A comment block placed at the very top of the HTML file (before `<!DOCTYPE html>`):

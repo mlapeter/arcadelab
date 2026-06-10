@@ -28,6 +28,12 @@ Supported library names (auto-injected via CDN — do NOT include script tags): 
 
 Rules: single HTML file, all JS/CSS inline, under 500KB, responsive at any viewport, no network calls (sandboxed `connect-src 'none'` — fetch/XHR/WebSocket are blocked).
 
+Publish guardrails to know about:
+
+- Pasting a creator-code message ("My ArcadeLab creator code is ...") instead of game code is rejected — keep the code private and paste the game HTML instead.
+- Non-HTML pastes (Python/pygame, bare JS modules, plain text) are rejected with a hint: convert to one self-contained HTML file first. Browsers can't run Python.
+- Publishing the same title twice within 15 minutes updates the existing game instead of creating a duplicate (the JSON response includes `updated: true`). This makes retries safe.
+
 ## Identity
 
 ArcadeLab uses Creator Codes (e.g., `ROCKET-WOLF-COMET-73`) instead of email/password. A code is a casual identifier, not a credential. Creators get one automatically when they first publish.

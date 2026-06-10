@@ -49,7 +49,9 @@ const args = process.argv.slice(2);
 const apply = args.includes("--apply");
 const limitIdx = args.indexOf("--limit");
 const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) || 0 : 0;
-const explicitSlugs = args.filter((a, i) => !a.startsWith("--") && i !== limitIdx + 1);
+const explicitSlugs = args.filter(
+  (a, i) => !a.startsWith("--") && (limitIdx === -1 || i !== limitIdx + 1)
+);
 
 // Mirrors src/lib/moderation.ts — kept in sync by hand (small + rarely changes).
 // It's the same moderation call; this script just uses different fields of it.

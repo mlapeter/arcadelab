@@ -23,6 +23,8 @@ export default function GameBrowser({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped on every new query so a slow stale response can't clobber results.
+  const requestIdRef = useRef(0);
 
   function buildUrl(s: SortOption, q: string, p: number) {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE), sort: s, page: String(p) });
@@ -31,20 +33,27 @@ export default function GameBrowser({
   }
 
   function reload(s: SortOption, q: string) {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setPage(1);
     fetch(buildUrl(s, q, 1))
       .then((res) => res.json())
       .then((data) => {
+        if (requestId !== requestIdRef.current) return;
         setGames(data.games || []);
         setTotal(data.total || 0);
       })
-      .catch(() => setGames([]))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (requestId === requestIdRef.current) setGames([]);
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false);
+      });
   }
 
   function handleSort(key: SortOption) {
     if (key === sort) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSort(key);
     reload(key, search);
   }
@@ -56,12 +65,20 @@ export default function GameBrowser({
   }
 
   function loadMore() {
+    const requestId = requestIdRef.current;
     const next = page + 1;
     setLoadingMore(true);
     fetch(buildUrl(sort, search, next))
       .then((res) => res.json())
       .then((data) => {
-        setGames((prev) => [...prev, ...(data.games || [])]);
+        if (requestId !== requestIdRef.current) return; // tab/search changed mid-flight
+        setGames((prev) => {
+          // A game published mid-browse shifts the pages — drop any repeats.
+          const fresh = (data.games || []).filter(
+            (g: Game) => !prev.some((p) => p.id === g.id)
+          );
+          return [...prev, ...fresh];
+        });
         setTotal(data.total || 0);
         setPage(next);
       })

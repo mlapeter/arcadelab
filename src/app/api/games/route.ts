@@ -83,32 +83,15 @@ export async function GET(request: NextRequest) {
 // A kid (or their AI) re-submitting the same title within minutes is a retry,
 // not a new game — we update the existing game instead of creating a twin.
 
+// Same title ignoring case, punctuation, and extra whitespace — and nothing
+// fuzzier. "Snake" vs "Snake 2" is a kid making a sequel, not a retry, and
+// merging those would silently destroy the first game.
 const normalizeTitle = (t: string) =>
   t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 
-function editDistance(a: string, b: string): number {
-  let row = Array.from({ length: a.length + 1 }, (_, i) => i);
-  for (let j = 1; j <= b.length; j++) {
-    const next = [j];
-    for (let i = 1; i <= a.length; i++) {
-      next[i] = Math.min(
-        row[i] + 1,
-        next[i - 1] + 1,
-        row[i - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
-      );
-    }
-    row = next;
-  }
-  return row[a.length];
-}
-
-/** Same or near-same title: case/punctuation-insensitive, tiny typos allowed. */
 function isNearSameTitle(a: string, b: string): boolean {
   const na = normalizeTitle(a);
-  const nb = normalizeTitle(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
-  return na.length > 4 && nb.length > 4 && editDistance(na, nb) <= 2;
+  return na.length > 0 && na === normalizeTitle(b);
 }
 
 export async function POST(request: NextRequest) {

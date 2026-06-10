@@ -189,8 +189,9 @@ export const MAX_DESCRIPTION_LENGTH = 280;
 
 /** Does the text contain anything that looks like a real HTML tag? */
 function looksLikeHtml(text: string): boolean {
-  return /<\s*(!doctype|html|head|body|script|style|canvas|div|svg|main|section|h[1-6]|p|button|img|a)\b/i.test(
-    text
+  return (
+    /<(!doctype|html|head|body|script|style|canvas|div|svg|main|section|h[1-6]|button|img)\b/i.test(text) ||
+    /<\/[a-z][a-z0-9]*>/i.test(text) // any closing tag (covers <pre>, <table>, ...)
   );
 }
 

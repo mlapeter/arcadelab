@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "thumbnails": "node scripts/capture-thumbnails.mjs",
-    "moderate": "node scripts/moderate-games.mjs"
+    "moderate": "node scripts/moderate-games.mjs",
+    "backfill": "node scripts/backfill-descriptions.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.95.3",

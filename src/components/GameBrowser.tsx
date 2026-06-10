@@ -84,7 +84,7 @@ export default function GameBrowser({
   return (
     <>
       {/* Sort tabs in RPG panel */}
-      <div className="rpg-panel inline-flex mx-auto mb-4 p-1">
+      <div className="rpg-panel inline-flex flex-wrap justify-center max-w-full mx-auto mb-4 p-1">
         {tabs.map((tab) => (
           <button
             key={tab.key}

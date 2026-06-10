@@ -11,5 +11,7 @@ export function generateSlug(title: string, displayName: string): string {
     .replace(/^-|-$/g, "")
     .slice(0, 20);
 
-  return `${titleSlug}-${nameSlug}`;
+  // Non-Latin titles (Arabic, Hebrew, CJK...) slugify to nothing — fall back
+  // to "game" so the URL stays friendly instead of starting with a dash.
+  return `${titleSlug || "game"}-${nameSlug}`;
 }

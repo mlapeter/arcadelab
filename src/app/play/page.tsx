@@ -10,16 +10,17 @@ import {
 } from "@/lib/schema";
 
 async function getGames() {
-  const { data: games } = await supabase
+  const { data: games, count } = await supabase
     .from("games")
-    .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url")
+    .select("id, slug, title, creator_id, play_count, like_count, emoji, color, thumbnail_url, preview_url", { count: "exact" })
     .eq("status", "active")
     // Default view is "Best" — quality_score, with newest as the tiebreaker.
     .order("quality_score", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(40);
 
-  if (!games || games.length === 0) return [];
+  const total = count || 0;
+  if (!games || games.length === 0) return { games: [], total };
 
   // Fetch creator names
   const creatorIds = [...new Set(games.map((g) => g.creator_id).filter(Boolean))];
@@ -36,18 +37,21 @@ async function getGames() {
     }
   }
 
-  return games.map((game) => ({
-    id: game.id,
-    slug: game.slug,
-    title: game.title,
-    creator_name: creatorsMap[game.creator_id] || "Unknown",
-    play_count: game.play_count,
-    like_count: game.like_count,
-    emoji: game.emoji,
-    color: game.color,
-    thumbnail_url: game.thumbnail_url,
-    preview_url: game.preview_url,
-  }));
+  return {
+    total,
+    games: games.map((game) => ({
+      id: game.id,
+      slug: game.slug,
+      title: game.title,
+      creator_name: creatorsMap[game.creator_id] || "Unknown",
+      play_count: game.play_count,
+      like_count: game.like_count,
+      emoji: game.emoji,
+      color: game.color,
+      thumbnail_url: game.thumbnail_url,
+      preview_url: game.preview_url,
+    })),
+  };
 }
 
 export const metadata = {
@@ -58,7 +62,7 @@ export const metadata = {
 };
 
 export default async function PlayPage() {
-  const initialGames = await getGames();
+  const { games: initialGames, total } = await getGames();
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -86,7 +90,7 @@ export default async function PlayPage() {
         👾 All Games
       </h1>
       <div className="flex flex-col items-center">
-        <GameBrowser initialGames={initialGames} />
+        <GameBrowser initialGames={initialGames} initialTotal={total} />
       </div>
     </main>
   );

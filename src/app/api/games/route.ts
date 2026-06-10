@@ -244,11 +244,11 @@ export async function POST(request: NextRequest) {
 
       const existing = (recent || []).find((g) => isNearSameTitle(g.title, title));
       if (existing) {
-        await supabase
+        const { error: contentError } = await supabase
           .from("game_content")
           .update({ html, content_hash: contentHash })
           .eq("game_id", existing.id);
-        await supabase
+        const { error: gameError } = await supabase
           .from("games")
           .update({
             title,
@@ -259,6 +259,13 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq("id", existing.id);
+        if (contentError || gameError) {
+          console.error("Failed to update recent duplicate:", contentError || gameError);
+          return NextResponse.json(
+            { error: "Failed to update your game — please try again" },
+            { status: 500 }
+          );
+        }
 
         after(async () => {
           const result = await moderateContent({ title, description, html, emoji });
@@ -273,7 +280,7 @@ export async function POST(request: NextRequest) {
             title,
             creator: creatorName,
             updated: true,
-            message: `You published "${existing.title}" a few minutes ago, so we updated that game instead of making a copy.`,
+            message: `You published this game a few minutes ago, so we updated it instead of making a copy.`,
           },
           { status: 200 }
         );

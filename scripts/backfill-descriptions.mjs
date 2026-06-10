@@ -122,7 +122,7 @@ async function generateFallbacks(title, description, emoji, html) {
   const text = data?.content?.[0]?.text || "";
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("no JSON in response");
+  if (start === -1 || end === -1 || end <= start) throw new Error("no JSON in response");
 
   // Same lenient clipping as parseResult() in src/lib/moderation.ts. The reply
   // also carries verdict/quality — deliberately ignored here; moderate-games.mjs

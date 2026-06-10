@@ -59,13 +59,13 @@ async function getFeaturedGames() {
 
 /**
  * Top community games for the homepage — the most-played active games that
- * aren't part of the first-party Featured showcase. We exclude both the
- * featured slugs and the featured games' creators (those are our own demo
- * accounts) so this section is genuinely from the community.
+ * aren't part of the first-party Featured showcase. We exclude the featured
+ * slugs (no double-listing) and anything by the ArcadeLab demo account, but
+ * not featured creators in general — a kid whose game gets featured should
+ * still see their other games here.
  */
 async function getCommunityGames(featuredGames: Awaited<ReturnType<typeof getFeaturedGames>>) {
   const excludeSlugs = [...new Set([...getFeaturedGameSlugs(), ...featuredGames.map((g) => g.slug)])];
-  const excludeCreatorIds = [...new Set(featuredGames.map((g) => g.creator_id).filter(Boolean))];
 
   let query = supabase
     .from("games")
@@ -73,19 +73,21 @@ async function getCommunityGames(featuredGames: Awaited<ReturnType<typeof getFea
     .eq("status", "active")
     .order("play_count", { ascending: false })
     .order("like_count", { ascending: false })
-    .limit(8);
+    .limit(24);
   if (excludeSlugs.length > 0) query = query.not("slug", "in", `(${excludeSlugs.join(",")})`);
-  if (excludeCreatorIds.length > 0) query = query.not("creator_id", "in", `(${excludeCreatorIds.join(",")})`);
 
   const { data: games } = await query;
   if (!games || games.length === 0) return [];
 
   const creatorsMap = await getCreatorNames([...new Set(games.map((g) => g.creator_id).filter(Boolean))]);
 
-  return games.map((g) => ({
-    ...g,
-    creator_name: creatorsMap[g.creator_id] || "Unknown",
-  }));
+  return games
+    .map((g) => ({
+      ...g,
+      creator_name: creatorsMap[g.creator_id] || "Unknown",
+    }))
+    .filter((g) => g.creator_name !== "ArcadeLab")
+    .slice(0, 8);
 }
 
 const HOMEPAGE_FAQS = [

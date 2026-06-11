@@ -4,15 +4,42 @@ import { generateCreatorCode } from "@/lib/creator-codes";
 import { generateApiToken, hashToken } from "@/lib/auth";
 import { generateDisplayName } from "@/lib/display-names";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
-  if (!rateLimit(getClientIp(request))) {
+  const clientIp = getClientIp(request);
+  if (!rateLimit(clientIp)) {
     return NextResponse.json({ error: "Too many requests — slow down!" }, { status: 429 });
   }
+
+  // Same keyed hash as games.submit_ip_hash — a same-device signal, never a raw IP.
+  const registerIpHash = crypto
+    .createHmac("sha256", process.env.SUPABASE_SERVICE_ROLE_KEY || "salt")
+    .update(clientIp)
+    .digest("hex");
 
   try {
     const body = await request.json();
     const isAuto = body.auto === true;
+
+    // Same device just made an account? Suggest it instead of silently creating
+    // a twin. Suggestion only — the kid becomes that account by pasting its
+    // code, never automatically. body.fresh means they already said "someone new".
+    if (isAuto && body.fresh !== true) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: recent, error: lookupError } = await supabase
+        .from("creators")
+        .select("display_name")
+        .eq("register_ip_hash", registerIpHash)
+        .gte("created_at", sevenDaysAgo)
+        .neq("trust", "banned")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      // Column may not exist yet (migration pending) — skip the suggestion silently.
+      if (!lookupError && recent && recent.length > 0) {
+        return NextResponse.json({ suggestion: { display_name: recent[0].display_name } });
+      }
+    }
 
     let displayName: string;
 
@@ -94,17 +121,31 @@ export async function POST(request: NextRequest) {
     const rawToken = generateApiToken();
     const hashedToken = hashToken(rawToken);
 
-    const { data: creator, error } = await supabase
+    let { data: creator, error } = await supabase
       .from("creators")
       .insert({
         display_name: displayName,
         creator_code: creatorCode,
         api_token: hashedToken,
+        register_ip_hash: registerIpHash,
       })
       .select("id, display_name, creator_code, created_at")
       .single();
 
-    if (error) {
+    // register_ip_hash column may not exist yet (migration pending) — retry without it.
+    if (error && (error.code === "42703" || error.code === "PGRST204")) {
+      ({ data: creator, error } = await supabase
+        .from("creators")
+        .insert({
+          display_name: displayName,
+          creator_code: creatorCode,
+          api_token: hashedToken,
+        })
+        .select("id, display_name, creator_code, created_at")
+        .single());
+    }
+
+    if (error || !creator) {
       console.error("Failed to create creator:", error);
       return NextResponse.json(
         { error: "Failed to create account" },

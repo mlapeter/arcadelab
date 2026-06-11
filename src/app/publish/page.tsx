@@ -73,6 +73,7 @@ libraries: phaser, p5
 emoji: 🚀
 color: blue
 remix_of: original-game-slug
+creator_code: ROCKET-WOLF-COMET-73
 -->
 
 <!DOCTYPE html>
@@ -97,6 +98,13 @@ remix_of: original-game-slug
           After pasting, the game preview loads automatically. The creator can edit the title and description,
           then click Publish. They will get a Creator Code (like ROCKET-WOLF-COMET-73) if they are new,
           or can enter their existing creator code to publish under their existing identity.
+        </p>
+
+        <p>
+          The optional creator_code header field publishes the game as that creator from any browser — the
+          line is stripped server-side before the game is stored and never appears in the published HTML or
+          the public source view. Pasting a bare creator code (instead of game code) into the paste zone
+          offers one-tap sign-in rather than an error.
         </p>
 
         <p>Games with the older KIDHUBB header format are still fully supported.</p>

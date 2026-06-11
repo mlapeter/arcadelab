@@ -3,9 +3,29 @@
 import { useState, useEffect, useRef } from "react";
 import { parseGameHeader, type ParsedGame } from "@/lib/parse-game";
 import { isCreatorCodeMessage } from "@/lib/safety";
+import { extractPastedCode, suggestCreatorCode, type DetectedCode } from "@/lib/creator-codes";
 import { getCreatorIdentity, saveCreatorIdentity, type CreatorIdentity } from "@/lib/identity";
 
 type Phase = "paste" | "welcome" | "confirm" | "success";
+
+/** Error text with "arcadelab.ai/appeal" rendered as a real link. */
+function ErrorMessage({ message }: { message: string }) {
+  const parts = message.split("arcadelab.ai/appeal");
+  return (
+    <p className="text-[10px] text-accent-red">
+      {parts.map((part, i) => (
+        <span key={i}>
+          {i > 0 && (
+            <a href="/appeal" className="underline hover:text-accent-gold">
+              arcadelab.ai/appeal
+            </a>
+          )}
+          {part}
+        </span>
+      ))}
+    </p>
+  );
+}
 
 interface PublishResult {
   url: string;
@@ -21,10 +41,31 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
   // Identity
   const [identity, setIdentity] = useState<CreatorIdentity | null>(null);
-  const [showRecovery, setShowRecovery] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [recoveryError, setRecoveryError] = useState("");
+  const [recoverySuggestion, setRecoverySuggestion] = useState("");
   const [recovering, setRecovering] = useState(false);
+  const recoveryInputRef = useRef<HTMLInputElement>(null);
+
+  // Pasted-code sign-in offer
+  const [signInOffer, setSignInOffer] = useState<{
+    code: string;
+    display_name: string;
+    /** The raw paste, when the code is a typo correction of it. */
+    typoFrom?: string;
+    /** Current account has published games — show the "stays safe" line. */
+    showStaySafe: boolean;
+  } | null>(null);
+  const [checkingCode, setCheckingCode] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  // Same-device register suggestion (asked at most once)
+  const [registerSuggestion, setRegisterSuggestion] = useState<{
+    name: string;
+    parsed: ParsedGame;
+  } | null>(null);
+  const suggestionAskedRef = useRef(false);
 
   // Game
   const [focused, setFocused] = useState(false);
@@ -116,8 +157,19 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
     fetchRemixInfo();
   }, [remixOfSlug]);
 
-  function handlePaste(code: string) {
-    // A pasted creator-code message must never be echoed into the preview.
+  async function handlePaste(code: string) {
+    // A pasted creator code — bare, or the reminder message — is a sign-in
+    // attempt, not a game. Offer to sign in instead of rejecting it.
+    const detected = extractPastedCode(code);
+    if (detected) {
+      setRawCode("");
+      setParsed(null);
+      await offerSignIn(detected);
+      return;
+    }
+
+    // Fallback for mangled reminder messages where no code can be extracted.
+    // Must never be echoed into the preview.
     if (isCreatorCodeMessage(code)) {
       setRawCode("");
       setParsed(null);
@@ -127,6 +179,8 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       return;
     }
 
+    setSignInOffer(null);
+    setNotice("");
     setRawCode(code);
     if (!code.trim()) {
       setParsed(null);
@@ -139,6 +193,13 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
     setDescription(result.description || existingGame?.description || "");
     setError("");
 
+    // A creator_code in the game header wins over whatever this browser
+    // remembers — it's how identity survives any device. Skipped in update
+    // mode, where ownership was already checked at load.
+    if (!updateSlug && result.creator_code && result.creator_code !== identity?.creator_code) {
+      if (await adoptHeaderIdentity(result.creator_code)) return;
+    }
+
     if (identity) {
       setPhase("confirm");
     } else if (updateSlug) {
@@ -148,7 +209,126 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
     }
   }
 
-  async function autoCreateAccount(parsedGame: ParsedGame) {
+  /** Resolve a pasted code (peek — no cookie yet) and offer to sign in. */
+  async function offerSignIn(detected: DetectedCode) {
+    const candidate = detected.valid ? detected.raw : detected.suggestion!;
+    setError("");
+    setNotice("");
+    setSignInOffer(null);
+
+    if (identity?.creator_code === candidate) {
+      setNotice(`You're already signed in as ${identity.display_name}! Paste your game code to publish.`);
+      return;
+    }
+
+    setCheckingCode(true);
+    try {
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          creator_code: candidate,
+          peek: true,
+          ...(identity && { current_creator_id: identity.creator_id }),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError("Hmm, that code doesn't match anyone — check for typos!");
+        return;
+      }
+
+      // Signed in as an account with zero games? Just switch — abandoning the
+      // empty account is the whole retirement ceremony.
+      if (identity && (data.games_count ?? 0) === 0) {
+        await signInAs(candidate);
+        return;
+      }
+
+      setSignInOffer({
+        code: candidate,
+        display_name: data.display_name,
+        typoFrom: detected.valid ? undefined : detected.raw,
+        showStaySafe: !!identity,
+      });
+    } catch {
+      setError("Couldn't connect — try again");
+    } finally {
+      setCheckingCode(false);
+    }
+  }
+
+  /** Verify for real (sets the identity cookie) and become that account. */
+  async function signInAs(code: string) {
+    setSigningIn(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creator_code: code }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Code not found — check for typos!");
+        return;
+      }
+
+      const newIdentity: CreatorIdentity = {
+        creator_id: data.id,
+        creator_code: data.creator_code,
+        display_name: data.display_name,
+      };
+      saveCreatorIdentity(newIdentity);
+      setIdentity(newIdentity);
+      setSignInOffer(null);
+      setRegisterSuggestion(null);
+    } catch {
+      setError("Couldn't connect — try again");
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  /**
+   * A creator_code embedded in the game header by an AI assistant. If it
+   * resolves, publish as that account and silently sign this browser in too.
+   * A bad header code never blocks a kid — return false and fall through.
+   */
+  async function adoptHeaderIdentity(code: string): Promise<boolean> {
+    try {
+      const peek = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creator_code: code, peek: true }),
+      });
+      if (!peek.ok) return false;
+
+      const res = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ creator_code: code }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+
+      const newIdentity: CreatorIdentity = {
+        creator_id: data.id,
+        creator_code: data.creator_code,
+        display_name: data.display_name,
+      };
+      saveCreatorIdentity(newIdentity);
+      setIdentity(newIdentity);
+      setPhase("confirm");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function autoCreateAccount(parsedGame: ParsedGame, fresh = false) {
     setCreatingAccount(true);
     setError("");
 
@@ -156,7 +336,12 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: null, auto: true }),
+        body: JSON.stringify({
+          display_name: null,
+          auto: true,
+          // Once the "Are you {name}?" question has been asked, never re-ask.
+          ...((fresh || suggestionAskedRef.current) && { fresh: true }),
+        }),
       });
 
       const data = await res.json();
@@ -164,6 +349,14 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       if (!res.ok) {
         setError(data.error || "Something went wrong creating your account");
         setCreatingAccount(false);
+        return;
+      }
+
+      // Same device made an account recently — ask once. Never auto-link: the
+      // only way to become that account is pasting its code.
+      if (data.suggestion) {
+        suggestionAskedRef.current = true;
+        setRegisterSuggestion({ name: data.suggestion.display_name, parsed: parsedGame });
         return;
       }
 
@@ -195,23 +388,31 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
     setPhase("confirm");
   }
 
-  async function handleRecovery() {
-    if (!recoveryCode.trim()) return;
+  async function handleRecovery(codeOverride?: string) {
+    const code = (codeOverride ?? recoveryCode).trim().toUpperCase();
+    if (!code) return;
 
     setRecovering(true);
     setRecoveryError("");
+    setRecoverySuggestion("");
 
     try {
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ creator_code: recoveryCode.trim() }),
+        body: JSON.stringify({ creator_code: code }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setRecoveryError(data.error || "Code not found");
+        const suggestion = res.status === 404 ? suggestCreatorCode(code) : null;
+        if (suggestion && suggestion !== code) {
+          setRecoverySuggestion(suggestion);
+          setRecoveryError("Hmm, that code doesn't match anyone.");
+        } else {
+          setRecoveryError(data.error || "Code not found");
+        }
         return;
       }
 
@@ -222,8 +423,11 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       };
       saveCreatorIdentity(recoveredIdentity);
       setIdentity(recoveredIdentity);
-      setShowRecovery(false);
       setRecoveryCode("");
+      setRegisterSuggestion(null);
+      // They pasted a game before signing in (register-suggestion flow) —
+      // go straight to publishing it.
+      if (parsed && !updateSlug) setPhase("confirm");
     } catch {
       setRecoveryError("Couldn't connect — try again");
     } finally {
@@ -386,7 +590,8 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
             }
             try {
               const text = await navigator.clipboard.readText();
-              if (text && text.trim().length > 50) {
+              // Codes are short — catch them even below the 50-char threshold.
+              if (text && (text.trim().length > 50 || extractPastedCode(text))) {
                 handlePaste(text);
               } else if (text && text.trim()) {
                 setRawCode(text);
@@ -438,56 +643,130 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
           </div>
         )}
 
-        {error && (
-          <div className="rpg-panel p-3">
-            <p className="text-[10px] text-accent-red">{error}</p>
+        {checkingCode && (
+          <div className="text-center py-4">
+            <span className="text-2xl pixel-blink">⏳</span>
+            <p className="mt-2 text-[10px] text-parchment/50">Checking that code...</p>
           </div>
         )}
 
-        {/* Recovery link */}
-        {!identity && (
-          <div className="text-center">
-            {!showRecovery ? (
+        {error && (
+          <div className="rpg-panel p-3">
+            <ErrorMessage message={error} />
+          </div>
+        )}
+
+        {notice && (
+          <div className="rpg-panel p-3 text-center">
+            <p className="text-[10px] text-wood-dark/70 normal-case">{notice}</p>
+          </div>
+        )}
+
+        {/* Pasted-code sign-in offer */}
+        {signInOffer && (
+          <div className="rpg-panel p-4 space-y-3 text-center">
+            {signInOffer.typoFrom && (
+              <p className="text-[10px] text-wood-mid/70 normal-case">
+                Looks like a small typo — did you mean{" "}
+                <span className="text-accent-purple">{signInOffer.code}</span>?
+              </p>
+            )}
+            <p className="text-xs text-wood-dark">
+              Sign in as <span className="font-bold">{signInOffer.display_name}</span>?
+            </p>
+            {signInOffer.showStaySafe && identity && (
+              <p className="text-[10px] text-wood-mid/60 normal-case">
+                Your games as {identity.display_name} stay safe — paste that code anytime to switch back.
+              </p>
+            )}
+            <button
+              onClick={() => signInAs(signInOffer.code)}
+              disabled={signingIn}
+              className="rpg-btn rpg-btn-green w-full px-6 py-4 text-[10px] disabled:opacity-50"
+            >
+              {signingIn ? "Signing in..." : `✓ Sign in as ${signInOffer.display_name}`}
+            </button>
+            <button
+              onClick={() => {
+                setSignInOffer(null);
+                setRawCode("");
+              }}
+              className="text-[10px] text-wood-mid/50 hover:text-wood-dark block mx-auto"
+            >
+              No thanks
+            </button>
+          </div>
+        )}
+
+        {/* Same-device register suggestion (asked at most once) */}
+        {registerSuggestion && (
+          <div className="rpg-panel p-4 space-y-3 text-center">
+            <p className="text-xs text-wood-dark">
+              Are you <span className="font-bold">{registerSuggestion.name}</span>?
+            </p>
+            <p className="text-[10px] text-wood-mid/70 normal-case">
+              Paste your creator code to keep publishing as them — or keep going as someone new.
+            </p>
+            <button
+              onClick={() => {
+                setRegisterSuggestion(null);
+                setTimeout(() => recoveryInputRef.current?.focus(), 0);
+              }}
+              className="rpg-btn rpg-btn-purple w-full px-4 py-3 text-[10px]"
+            >
+              🔑 I have my creator code
+            </button>
+            <button
+              onClick={() => {
+                const pendingParsed = registerSuggestion.parsed;
+                setRegisterSuggestion(null);
+                autoCreateAccount(pendingParsed, true);
+              }}
+              className="rpg-btn w-full px-4 py-3 text-[10px]"
+            >
+              ✨ I&apos;m someone new
+            </button>
+          </div>
+        )}
+
+        {/* Published before? Creator code entry */}
+        {!identity && !signInOffer && !registerSuggestion && (
+          <div className="rpg-panel p-4 space-y-3">
+            <p className="text-[10px] text-wood-dark text-center">
+              🔑 Published before? Enter your creator code to keep your name.
+            </p>
+            <div className="flex gap-2">
+              <input
+                ref={recoveryInputRef}
+                type="text"
+                value={recoveryCode}
+                onChange={(e) => setRecoveryCode(e.target.value)}
+                placeholder="WORD-WORD-WORD-00"
+                aria-label="Your creator code"
+                className="flex-1 border-4 border-wood-mid bg-parchment-dark px-3 py-2 text-[10px] text-wood-dark placeholder:text-wood-mid/40 focus:outline-none focus:border-accent-purple"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleRecovery();
+                }}
+              />
               <button
-                onClick={() => setShowRecovery(true)}
-                className="text-[10px] text-parchment/30 hover:text-parchment/60"
+                onClick={() => handleRecovery()}
+                disabled={recovering || !recoveryCode.trim()}
+                className="rpg-btn rpg-btn-purple px-4 py-2 text-[10px] disabled:opacity-50"
               >
-                Have a creator code?
+                {recovering ? "..." : "Go"}
               </button>
-            ) : (
-              <div className="rpg-panel p-4 space-y-3 text-left">
-                <p className="text-[10px] text-wood-dark/70 text-center">Enter your creator code</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={recoveryCode}
-                    onChange={(e) => setRecoveryCode(e.target.value)}
-                    placeholder="WORD-WORD-WORD-00"
-                    className="flex-1 border-4 border-wood-mid bg-parchment-dark px-3 py-2 text-[10px] text-wood-dark placeholder:text-wood-mid/40 focus:outline-none focus:border-accent-purple"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleRecovery();
-                    }}
-                  />
-                  <button
-                    onClick={handleRecovery}
-                    disabled={recovering || !recoveryCode.trim()}
-                    className="rpg-btn rpg-btn-purple px-4 py-2 text-[10px] disabled:opacity-50"
-                  >
-                    {recovering ? "..." : "Go"}
-                  </button>
-                </div>
-                {recoveryError && <p className="text-[10px] text-accent-red">{recoveryError}</p>}
-                <button
-                  onClick={() => {
-                    setShowRecovery(false);
-                    setRecoveryCode("");
-                    setRecoveryError("");
-                  }}
-                  className="text-[10px] text-wood-mid/50 hover:text-wood-dark block mx-auto"
-                >
-                  Cancel
-                </button>
-              </div>
+            </div>
+            {recoveryError && <p className="text-[10px] text-accent-red">{recoveryError}</p>}
+            {recoverySuggestion && (
+              <button
+                onClick={() => {
+                  setRecoveryCode(recoverySuggestion);
+                  handleRecovery(recoverySuggestion);
+                }}
+                className="rpg-btn rpg-btn-green w-full px-4 py-2 text-[10px]"
+              >
+                Did you mean {recoverySuggestion}?
+              </button>
             )}
           </div>
         )}
@@ -569,7 +848,7 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
         {error && (
           <div className="rpg-panel p-3">
-            <p className="text-[10px] text-accent-red">{error}</p>
+            <ErrorMessage message={error} />
           </div>
         )}
 

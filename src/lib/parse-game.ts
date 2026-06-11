@@ -10,6 +10,13 @@ export interface ParsedGame {
   emoji?: string;
   color?: GameColor;
   remix_of?: string;
+  /**
+   * Optional identity from the header — lets an AI assistant embed the kid's
+   * code so publishing works from any browser. Never part of gameHtml: the
+   * whole header is stripped here, and the server strips the creator_code
+   * line again as defense in depth. It must never reach stored/served HTML.
+   */
+  creator_code?: string;
   gameHtml: string;
 }
 
@@ -52,6 +59,8 @@ export function parseGameHeader(code: string): ParsedGame {
         }
       } else if (key === "remix_of") {
         result.remix_of = value.trim();
+      } else if (key === "creator_code") {
+        result.creator_code = value.trim().toUpperCase();
       }
     }
   }

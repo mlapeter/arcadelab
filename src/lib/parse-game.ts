@@ -84,16 +84,24 @@ export function stripHeaderCreatorCode(html: string): {
   html: string;
   creatorCode?: string;
 } {
-  const headerMatch = html.match(/<!--\s*(?:KIDHUBB|ARCADELAB)[\s\S]*?-->/);
-  if (!headerMatch) return { html };
-  const header = headerMatch[0];
-  const lineMatch = header.match(/^[ \t]*creator_code:[ \t]*(.+)$/m);
-  if (!lineMatch) return { html };
-  const cleaned = header.replace(/^[ \t]*creator_code:.*(?:\r?\n|$)/m, "");
-  return {
-    html: html.replace(header, cleaned),
-    creatorCode: lineMatch[1].trim().toUpperCase(),
-  };
+  let creatorCode: string | undefined;
+  // Every header block, any casing — and the line-removal must preserve a
+  // trailing --> on the same line, or the comment swallows the whole game.
+  const cleaned = html.replace(
+    /<!--\s*(?:KIDHUBB|ARCADELAB)[\s\S]*?-->/gi,
+    (header) => {
+      const m = header.match(
+        /^[ \t]*creator_code:[ \t]*([^\r\n]*?)[ \t]*(?=-->|\r?\n|$)/im
+      );
+      if (!m) return header;
+      creatorCode ??= m[1].trim().toUpperCase();
+      return header.replace(
+        /^[ \t]*creator_code:[^\r\n]*?[ \t]*(?=-->)|^[ \t]*creator_code:[^\r\n]*\r?\n?/im,
+        ""
+      );
+    }
+  );
+  return creatorCode ? { html: cleaned, creatorCode } : { html };
 }
 
 function extractTitleFromHtml(html: string): string | undefined {

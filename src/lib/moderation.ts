@@ -19,7 +19,7 @@
 // an API is down.
 import crypto from "crypto";
 import { supabase } from "@/lib/supabase";
-import { findCreatorCodes } from "@/lib/creator-codes";
+import { findCreatorCodes, scrubCreatorCodes } from "@/lib/creator-codes";
 import { logDecision } from "@/lib/decisions";
 
 const MODEL = "claude-haiku-4-5-20251001";
@@ -340,17 +340,6 @@ async function callModel(
   }
 }
 
-/**
- * Calls Haiku to classify a submission, without creator context.
- * @deprecated Prefer moderateAndApply — it enriches the prompt with creator
- * context and applies trust-weighted actions in one step.
- */
-export async function moderateContent(
-  input: ModerationInput
-): Promise<ModerationResult | null> {
-  return callModel(MODEL, input, "", true);
-}
-
 /** Leniently extract the JSON object from the model's reply. */
 function parseResult(text: string): ModerationResult | null {
   const start = text.indexOf("{");
@@ -376,7 +365,10 @@ function parseResult(text: string): ModerationResult | null {
       note: typeof raw.note === "string" ? raw.note.slice(0, 200) : "",
     };
     if (typeof raw.description === "string" && raw.description.trim()) {
-      result.description = raw.description.trim().slice(0, 150);
+      // The prompt's context block contains the submitter's real code — make
+      // sure the model can't echo it into a publicly-served description.
+      const scrubbed = scrubCreatorCodes(raw.description.trim()).slice(0, 150);
+      if (scrubbed) result.description = scrubbed;
     }
     if (typeof raw.emoji === "string" && raw.emoji.trim()) {
       result.emoji = [...raw.emoji.trim()].slice(0, 2).join(""); // one emoji (may be 2 code points)
@@ -437,38 +429,6 @@ export async function moderateAndApply(
     classified.facts,
     classified.contextBlock
   );
-}
-
-/**
- * Records a moderation result on a game and acts on the verdict with the
- * trust-weighted rules (own-code override, established creators never banned,
- * second opinion before any ban).
- * @deprecated Prefer moderateAndApply. Kept for existing call sites — it
- * re-fetches the game to compute the same facts and applies the same rules.
- */
-export async function applyModeration(gameId: string, result: ModerationResult) {
-  const { data: game } = await supabase
-    .from("games")
-    .select("title, description, emoji, creator_id")
-    .eq("id", gameId)
-    .single();
-  if (!game?.creator_id) return;
-  const { data: content } = await supabase
-    .from("game_content")
-    .select("html")
-    .eq("game_id", gameId)
-    .single();
-
-  const input: ModerateInput = {
-    title: game.title,
-    description: game.description,
-    html: content?.html || "",
-    emoji: game.emoji,
-    creatorId: game.creator_id,
-  };
-  const ctx = await gatherCreatorContext(game.creator_id, gameId);
-  const facts = await computeContentFacts(input, ctx.creatorCode);
-  await applyVerdict(gameId, input, result, ctx, facts, buildContextBlock(ctx, facts));
 }
 
 async function applyVerdict(

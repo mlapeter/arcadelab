@@ -50,12 +50,20 @@ export const NOUNS = [
   "ROCKET", "HAMMER", "DYNAMO", "GADGET", "TURRET", "FORTRESS", "CITADEL", "PORTAL",
 ];
 
+// The example code used across the docs (/for-ai, llms.txt, prompt templates).
+// Never issue it to a real kid — doc-copied headers would publish to their account.
+const RESERVED_CODES = new Set(["ROCKET-WOLF-COMET-73"]);
+
 export function generateCreatorCode(): string {
-  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun1 = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const noun2 = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const num = Math.floor(Math.random() * 90) + 10; // 10-99
-  return `${adj}-${noun1}-${noun2}-${num}`;
+  let code: string;
+  do {
+    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+    const noun1 = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+    const noun2 = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+    const num = Math.floor(Math.random() * 90) + 10; // 10-99
+    code = `${adj}-${noun1}-${noun2}-${num}`;
+  } while (RESERVED_CODES.has(code));
+  return code;
 }
 
 // --- Creator codes as a protocol ---

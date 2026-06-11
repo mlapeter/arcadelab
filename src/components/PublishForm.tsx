@@ -299,14 +299,6 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
    */
   async function adoptHeaderIdentity(code: string): Promise<boolean> {
     try {
-      const peek = await fetch("/api/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ creator_code: code, peek: true }),
-      });
-      const peeked = await peek.json();
-      if (!peek.ok || peeked.error || !peeked.display_name) return false;
-
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -767,6 +759,16 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
                 className="rpg-btn rpg-btn-green w-full px-4 py-2 text-[10px]"
               >
                 Did you mean {recoverySuggestion}?
+              </button>
+            )}
+            {/* Came here from "Are you {name}?" but can't find the code —
+                always a way forward, never a dead end. */}
+            {parsed && suggestionAskedRef.current && (
+              <button
+                onClick={() => autoCreateAccount(parsed, true)}
+                className="text-[10px] text-wood-mid/50 hover:text-wood-dark block mx-auto"
+              >
+                ✨ Actually, I&apos;m someone new
               </button>
             )}
           </div>

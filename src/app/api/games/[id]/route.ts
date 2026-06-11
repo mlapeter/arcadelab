@@ -9,9 +9,15 @@ import {
   MAX_TITLE_LENGTH,
   MAX_DESCRIPTION_LENGTH,
 } from "@/lib/safety";
-import { moderateContent, applyModeration } from "@/lib/moderation";
+import { moderateAndApply, checkScamFingerprint } from "@/lib/moderation";
+import { logDecision } from "@/lib/decisions";
+import { scrubCreatorCodes } from "@/lib/creator-codes";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
-import { VALID_COLORS, type GameColor } from "@/lib/parse-game";
+import {
+  VALID_COLORS,
+  stripHeaderCreatorCode,
+  type GameColor,
+} from "@/lib/parse-game";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import crypto from "crypto";
 
@@ -59,14 +65,23 @@ export async function PUT(
     );
 
     const body = await request.json();
+
+    // Strip the header creator_code line before the html can reach storage
+    // (same non-negotiable as publish); it also works as an identity fallback.
+    const stripped =
+      typeof body.html === "string"
+        ? stripHeaderCreatorCode(body.html)
+        : { html: body.html, creatorCode: undefined };
+
     let creatorId = creator?.id;
     let creatorTrust = creator?.trust;
 
-    if (!creatorId && body.creator_code) {
+    for (const code of [body.creator_code, stripped.creatorCode]) {
+      if (creatorId || !code) continue;
       const { data } = await supabase
         .from("creators")
         .select("id, trust")
-        .eq("creator_code", body.creator_code)
+        .eq("creator_code", code)
         .single();
 
       if (data) {
@@ -82,7 +97,10 @@ export async function PUT(
     // Banned creators can't publish updates either. Neutral message.
     if (creatorTrust === "banned") {
       return NextResponse.json(
-        { error: "Publishing isn't available for this account." },
+        {
+          error:
+            "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
+        },
         { status: 403 }
       );
     }
@@ -102,7 +120,7 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const html = body.html;
+    const html = stripped.html;
     if (!html || typeof html !== "string") {
       return NextResponse.json({ error: "Game HTML is required" }, { status: 400 });
     }
@@ -126,8 +144,12 @@ export async function PUT(
       return NextResponse.json({ error: notHtml }, { status: 400 });
     }
 
-    const title = body.title?.trim() || undefined;
-    const description = body.description !== undefined ? (body.description?.trim() || null) : undefined;
+    // Code-shaped tokens never belong in a title or description.
+    const title = scrubCreatorCodes(body.title?.trim() || "") || undefined;
+    const description =
+      body.description !== undefined
+        ? scrubCreatorCodes(body.description?.trim() || "") || null
+        : undefined;
     const libraries = body.libraries
       ? (body.libraries as string[]).filter((l) => VALID_LIBRARY_KEYS.includes(l))
       : undefined;
@@ -182,16 +204,28 @@ export async function PUT(
     }
 
     // Re-moderate after the response — closes the publish-clean-then-edit-to-scam
-    // gap. A non-"safe" verdict auto-shadow-hides the updated game.
-    after(async () => {
-      const result = await moderateContent({
-        title: updatedGame.title,
-        description: description ?? null,
-        html,
-        emoji: emoji ?? null,
+    // gap. Fingerprint-matched content (a confirmed scam edited into an existing
+    // game) is hidden immediately, pre-AI.
+    const ownerId = creatorId;
+    if (await checkScamFingerprint(html)) {
+      await supabase
+        .from("games")
+        .update({ status: "hidden", flag_reason: "fingerprint" })
+        .eq("id", game.id);
+      after(() =>
+        logDecision("fingerprint_hide", { gameId: game.id, creatorId: ownerId })
+      );
+    } else {
+      after(async () => {
+        await moderateAndApply(game.id, {
+          title: updatedGame.title,
+          description: description ?? null,
+          html,
+          emoji: emoji ?? null,
+          creatorId: ownerId,
+        });
       });
-      if (result) await applyModeration(game.id, result);
-    });
+    }
 
     return NextResponse.json({
       id: updatedGame.id,

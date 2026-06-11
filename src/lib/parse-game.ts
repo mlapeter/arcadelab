@@ -72,6 +72,30 @@ export function parseGameHeader(code: string): ParsedGame {
   return result;
 }
 
+/**
+ * Pull the creator_code line out of the ARCADELAB/KIDHUBB header, returning
+ * the cleaned html and the code. The server runs this on every publish and
+ * update before storing — NON-NEGOTIABLE: a creator code must never reach
+ * game_content, the rendered game, or the public source view. (The web form
+ * already strips the whole header client-side; this covers direct API
+ * publishes, where the header stays in the stored html.)
+ */
+export function stripHeaderCreatorCode(html: string): {
+  html: string;
+  creatorCode?: string;
+} {
+  const headerMatch = html.match(/<!--\s*(?:KIDHUBB|ARCADELAB)[\s\S]*?-->/);
+  if (!headerMatch) return { html };
+  const header = headerMatch[0];
+  const lineMatch = header.match(/^[ \t]*creator_code:[ \t]*(.+)$/m);
+  if (!lineMatch) return { html };
+  const cleaned = header.replace(/^[ \t]*creator_code:.*(?:\r?\n|$)/m, "");
+  return {
+    html: html.replace(header, cleaned),
+    creatorCode: lineMatch[1].trim().toUpperCase(),
+  };
+}
+
 function extractTitleFromHtml(html: string): string | undefined {
   // Try <title> tag first
   const titleMatch = html.match(/<title[^>]*>\s*([^<]+?)\s*<\/title>/i);

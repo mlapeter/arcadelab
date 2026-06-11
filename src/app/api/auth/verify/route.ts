@@ -24,11 +24,10 @@ export async function POST(request: NextRequest) {
       .eq("creator_code", creatorCode)
       .single();
 
+    // A code that doesn't match is an expected outcome (kids typo), not an
+    // error — 200 with an error field keeps the browser console clean.
     if (!creator) {
-      return NextResponse.json(
-        { error: "Code not found — check for typos!" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Code not found — check for typos!" });
     }
 
     // Peek mode: resolve the code without signing the browser in. Used by the

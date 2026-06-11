@@ -51,3 +51,4 @@ next-env.d.ts
 GOAL_NOTES.md
 backfill-dryrun.txt
 GOAL_NOTES_scale-up-archive.md
+local-test/

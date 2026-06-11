@@ -234,7 +234,7 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       });
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || data.error || !data.display_name) {
         setError("Hmm, that code doesn't match anyone — check for typos!");
         return;
       }
@@ -271,7 +271,7 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
       });
       const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || data.error || !data.id) {
         setError(data.error || "Code not found — check for typos!");
         return;
       }
@@ -304,15 +304,16 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ creator_code: code, peek: true }),
       });
-      if (!peek.ok) return false;
+      const peeked = await peek.json();
+      if (!peek.ok || peeked.error || !peeked.display_name) return false;
 
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ creator_code: code }),
       });
-      if (!res.ok) return false;
       const data = await res.json();
+      if (!res.ok || data.error || !data.id) return false;
 
       const newIdentity: CreatorIdentity = {
         creator_id: data.id,
@@ -405,8 +406,8 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
       const data = await res.json();
 
-      if (!res.ok) {
-        const suggestion = res.status === 404 ? suggestCreatorCode(code) : null;
+      if (!res.ok || data.error || !data.id) {
+        const suggestion = res.ok ? suggestCreatorCode(code) : null;
         if (suggestion && suggestion !== code) {
           setRecoverySuggestion(suggestion);
           setRecoveryError("Hmm, that code doesn't match anyone.");

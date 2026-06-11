@@ -22,10 +22,10 @@ export default function AppealForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contact: contact.trim(), message: message.trim() }),
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
         setState("done");
       } else {
-        const data = await res.json().catch(() => null);
         setError(data?.error || "Something went wrong — try again in a minute!");
         setState("idle");
       }

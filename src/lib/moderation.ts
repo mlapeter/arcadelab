@@ -394,6 +394,31 @@ function parseResult(text: string): ModerationResult | null {
 const QUALITY_BASE: Record<string, number> = { good: 3, basic: 1, broken: -3 };
 
 /**
+ * Read-only half of a moderation pass: context + facts + ONE model call,
+ * no DB writes. moderateAndApply acts on it; tests and audits can call it
+ * directly against real content without touching anything.
+ */
+export async function classifyGame(
+  input: ModerateInput,
+  opts: { model?: string; excludeGameId?: string } = {}
+) {
+  const ctx = await gatherCreatorContext(input.creatorId, opts.excludeGameId);
+  const facts = await computeContentFacts(input, ctx.creatorCode);
+  const contextBlock = buildContextBlock(ctx, facts, input.reportReason);
+  const result = await callModel(opts.model || MODEL, input, contextBlock, true);
+  if (!result) return null; // fail open — the game stays live
+  return {
+    result,
+    ctx,
+    facts,
+    contextBlock,
+    override: result.verdict === "scam" ? overrideReason(facts) : null,
+    established:
+      ctx.safePriors >= ESTABLISHED_SAFE_GAMES || ctx.trust === "trusted",
+  };
+}
+
+/**
  * SINGLE ENTRY POINT for a moderation pass: gathers creator context, computes
  * deterministic facts, makes ONE enriched Haiku call, and applies
  * trust-weighted actions (with a second-opinion gate before any ban).
@@ -402,12 +427,16 @@ export async function moderateAndApply(
   gameId: string,
   input: ModerateInput
 ): Promise<void> {
-  const ctx = await gatherCreatorContext(input.creatorId, gameId);
-  const facts = await computeContentFacts(input, ctx.creatorCode);
-  const contextBlock = buildContextBlock(ctx, facts, input.reportReason);
-  const result = await callModel(MODEL, input, contextBlock, true);
-  if (!result) return; // fail open — the game stays live
-  await applyVerdict(gameId, input, result, ctx, facts, contextBlock);
+  const classified = await classifyGame(input, { excludeGameId: gameId });
+  if (!classified) return;
+  await applyVerdict(
+    gameId,
+    input,
+    classified.result,
+    classified.ctx,
+    classified.facts,
+    classified.contextBlock
+  );
 }
 
 /**

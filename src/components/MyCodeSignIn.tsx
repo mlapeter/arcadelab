@@ -21,8 +21,8 @@ export default function MyCodeSignIn({ code }: { code: string }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ creator_code: code }),
         });
-        if (!res.ok) throw new Error();
         const creator = await res.json();
+        if (!res.ok || creator.error || !creator.id) throw new Error();
         if (cancelled) return;
         saveCreatorIdentity({
           creator_id: creator.id,

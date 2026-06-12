@@ -100,6 +100,7 @@ export async function PUT(
         {
           error:
             "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
+          banned: true,
         },
         { status: 403 }
       );

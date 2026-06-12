@@ -9,6 +9,7 @@
     "lint": "eslint",
     "thumbnails": "node scripts/capture-thumbnails.mjs",
     "moderate": "node scripts/moderate-games.mjs",
+    "consolidate-moderation": "node scripts/consolidate-moderation.mjs",
     "backfill": "node scripts/backfill-descriptions.mjs"
   },
   "dependencies": {

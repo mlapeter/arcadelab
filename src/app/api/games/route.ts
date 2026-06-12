@@ -16,6 +16,7 @@ import { scrubCreatorCodes } from "@/lib/creator-codes";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
 import {
   VALID_COLORS,
+  parseGameHeader,
   stripHeaderCreatorCode,
   type GameColor,
 } from "@/lib/parse-game";
@@ -169,17 +170,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A direct API publish may send just { html } — the ARCADELAB header is
+    // then the source of metadata, same as the paste box parses client-side.
+    // Body fields win when both are present.
+    const header = typeof html === "string" ? parseGameHeader(html) : ({} as ReturnType<typeof parseGameHeader>);
+
     // Code-shaped tokens never belong in a title or description.
-    const title = scrubCreatorCodes(body.title?.trim() || "") || "Untitled Game";
-    const description = scrubCreatorCodes(body.description?.trim() || "") || null;
-    const libraries = (body.libraries || []).filter((l: string) =>
+    const title =
+      scrubCreatorCodes((body.title ?? header.title)?.trim() || "") || "Untitled Game";
+    const description =
+      scrubCreatorCodes((body.description ?? header.description)?.trim() || "") || null;
+    const libraries = (body.libraries || header.libraries || []).filter((l: string) =>
       VALID_LIBRARY_KEYS.includes(l)
     );
-    const emoji = body.emoji?.trim() || null;
-    const color = VALID_COLORS.includes(body.color as GameColor) ? body.color : null;
+    const emoji = (body.emoji ?? header.emoji)?.trim() || null;
+    const headerOrBodyColor = body.color ?? header.color;
+    const color = VALID_COLORS.includes(headerOrBodyColor as GameColor)
+      ? headerOrBodyColor
+      : null;
 
     // Resolve remix_of slug to forked_from UUID
-    const remixOfSlug = body.remix_of || null;
+    const remixOfSlug = body.remix_of || header.remix_of || null;
     let forkedFrom: string | null = null;
     if (remixOfSlug) {
       const { data: original } = await supabase

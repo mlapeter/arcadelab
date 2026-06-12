@@ -97,7 +97,7 @@ export default function AppealChat({
             <p
               className={`max-w-[85%] px-3 py-2 text-[10px] normal-case leading-relaxed ${
                 m.role === "user"
-                  ? "bg-accent-purple/20 text-parchment border-2 border-accent-purple/40"
+                  ? "bg-accent-purple text-white border-2 border-purple-900"
                   : "bg-parchment text-wood-dark border-2 border-wood-mid"
               }`}
             >

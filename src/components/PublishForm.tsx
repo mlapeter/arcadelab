@@ -455,11 +455,11 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
       const data = await res.json();
 
-      if (!res.ok) {
-        if (data.banned) {
-          setBanned(true); // friendly ban panel instead of a scary red box
-          return;
-        }
+      if (data.banned) {
+        setBanned(true); // friendly ban panel instead of a scary red box
+        return;
+      }
+      if (!res.ok || data.error) {
         const msg = data.warnings ? `${data.error}: ${data.warnings.join(", ")}` : data.error || "Failed to publish";
         setError(msg);
         return;
@@ -504,11 +504,11 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
       const data = await res.json();
 
-      if (!res.ok) {
-        if (data.banned) {
-          setBanned(true);
-          return;
-        }
+      if (data.banned) {
+        setBanned(true);
+        return;
+      }
+      if (!res.ok || data.error) {
         const msg = data.warnings ? `${data.error}: ${data.warnings.join(", ")}` : data.error || "Failed to update";
         setError(msg);
         return;

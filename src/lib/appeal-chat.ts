@@ -319,9 +319,12 @@ async function creatorScamEvidence(creatorId: string): Promise<{
         .select("html")
         .eq("game_id", g.id)
         .single();
-      if (content?.html && (await checkScamFingerprint(content.html))) {
+      const match = content?.html ? await checkScamFingerprint(content.html) : null;
+      if (match) {
         out.fingerprintMatch = true;
-        out.matchedTitle = g.title;
+        // The SOURCE scam's title — that's the fingerprint entry the
+        // appellant's arguments should feed.
+        out.matchedTitle = match.source_title ?? g.title;
       }
     }
   } catch {

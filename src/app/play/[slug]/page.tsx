@@ -29,9 +29,10 @@ const getGame = cache(async function getGame(slug: string) {
     .single();
 
   // 'hidden'/'pending' games still render at their URL (a creator's shared
-  // link never breaks); only 'removed' games 404. Non-active games are
+  // link never breaks); 'removed' games get a friendly "taken down" state
+  // with a path to /appeal. Only missing slugs 404. Non-active games are
   // marked noindex in generateMetadata so they stay out of search.
-  if (!game || game.status === "removed") return null;
+  if (!game) return null;
 
   const { data: creator } = await supabase
     .from("creators")
@@ -50,6 +51,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const game = await getGame(slug);
 
   if (!game) return { title: "Game Not Found" };
+  if (game.status === "removed") {
+    return { title: "Game taken down", robots: { index: false, follow: false } };
+  }
 
   const url = `https://arcadelab.ai/play/${game.slug}`;
   const ogImage = `https://arcadelab.ai/play/${game.slug}/opengraph-image`;
@@ -90,6 +94,25 @@ export default async function PlayPage({ params }: Props) {
   const game = await getGame(slug);
 
   if (!game) notFound();
+
+  // Removed games are a dead end with a door: a kid whose game was taken
+  // down (maybe wrongly) always has a path to say "this was a mistake".
+  if (game.status === "removed") {
+    return (
+      <main className="mx-auto max-w-lg px-4 py-16 text-center space-y-6">
+        <div className="text-5xl">🚧</div>
+        <h1 className="text-sm sm:text-base text-accent-gold drop-shadow-[2px_2px_0_rgba(0,0,0,0.5)]">
+          This game was taken down.
+        </h1>
+        <p className="text-[10px] text-parchment/60 normal-case">
+          Think this was a mistake?
+        </p>
+        <Link href="/appeal" className="rpg-btn rpg-btn-purple inline-block px-6 py-4 text-[10px]">
+          Tell us →
+        </Link>
+      </main>
+    );
+  }
 
   // Check ownership
   let serverIsOwner = false;

@@ -143,7 +143,11 @@ export default function AboutPage() {
 
         <h2 className="text-xs text-wood-dark mt-6 mb-3">How do I contact ArcadeLab?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid normal-case">
-          Open an issue on the{" "}
+          Game taken down or can&apos;t publish? Tell us at{" "}
+          <Link href="/appeal" className="text-accent-purple underline">
+            arcadelab.ai/appeal
+          </Link>{" "}
+          — a human reads every one. For everything else, open an issue on the{" "}
           <a
             href="https://github.com/mlapeter/arcadelab/issues"
             className="text-accent-purple underline"
@@ -170,6 +174,7 @@ export default function AboutPage() {
           <li>Pricing: free, no paid tiers</li>
           <li>Identity model: Creator Codes (no email, no password)</li>
           <li>Security model: sandboxed iframes on a separate origin with connect-src: none</li>
+          <li>Appeals: if a game was taken down or a creator can&apos;t publish, submit at https://arcadelab.ai/appeal — a human reads every one (no email required)</li>
         </ul>
       </section>
     </main>

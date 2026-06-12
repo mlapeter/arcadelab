@@ -4,6 +4,8 @@
 // CSP headers (connect-src 'none', form-action 'none') add another layer. These
 // patterns are a lightweight first pass to catch obviously bad intent — not a
 // security boundary.
+import { extractPastedCode } from "./creator-codes";
+
 const BLOCKED_PATTERNS: { pattern: RegExp; reason: string }[] = [
   // Crypto mining
   { pattern: /CoinHive/i, reason: "Crypto mining" },
@@ -202,13 +204,16 @@ function withoutHeader(text: string): string {
 
 /**
  * A pasted creator-code message ("My ArcadeLab creator code is WORD-WORD-WORD-12...")
- * instead of game code. The message must never be echoed back or published.
+ * or a bare code, instead of game code. Detection is shared with the rest of the
+ * site via findCreatorCodes (word-list validated, typo-tolerant) — never the case
+ * that the publish box and the moderation pipeline disagree about what a code is.
+ * The message must never be echoed back or published.
  */
 export function isCreatorCodeMessage(text: string): boolean {
-  return (
-    !looksLikeHtml(text) &&
-    /creator\s+code[\s\S]{0,40}?\b[A-Z]+-[A-Z]+-[A-Z]+-\d+\b/i.test(text)
-  );
+  if (looksLikeHtml(text)) return false;
+  if (extractPastedCode(text)) return true;
+  // The classic reminder phrasing, even with a mangled/extra code in it.
+  return /creator\s+code[\s\S]{0,40}?\b[A-Za-z]+-[A-Za-z]+-[A-Za-z]+-\d+\b/.test(text);
 }
 
 /**

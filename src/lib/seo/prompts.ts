@@ -63,7 +63,10 @@ description: [One short sentence describing the game]
 libraries: phaser
 emoji: [single emoji that fits]
 color: [red, orange, green, blue, purple, pink, teal, or gold]
+creator_code: [my creator code, if I gave you one — otherwise leave this line out]
 -->
+
+If I give you my ArcadeLab creator code, include it in the header as creator_code: so my games are always published under my name. My code (leave blank if I'm new): ____
 
 The game should: [DESCRIBE YOUR GAME — mechanics, controls, goal, art direction]
 
@@ -102,7 +105,10 @@ description: [One short sentence]
 libraries: p5
 emoji: [single emoji]
 color: [red, orange, green, blue, purple, pink, teal, or gold]
+creator_code: [my creator code, if I gave you one — otherwise leave this line out]
 -->
+
+If I give you my ArcadeLab creator code, include it in the header as creator_code: so my sketches are always published under my name. My code (leave blank if I'm new): ____
 
 The sketch should: [DESCRIBE YOUR SKETCH — what you see, how it moves, any interactions]
 
@@ -140,7 +146,10 @@ description: [One short sentence]
 libraries: three
 emoji: [single emoji]
 color: [red, orange, green, blue, purple, pink, teal, or gold]
+creator_code: [my creator code, if I gave you one — otherwise leave this line out]
 -->
+
+If I give you my ArcadeLab creator code, include it in the header as creator_code: so my scenes are always published under my name. My code (leave blank if I'm new): ____
 
 The scene should: [DESCRIBE YOUR 3D SCENE — what's in it, how it animates, any interactions]
 
@@ -181,7 +190,10 @@ description: [One short sentence about what it shows]
 libraries: [omit, or "d3" if you're using D3]
 emoji: [📊 🔬 ⚛️ 🌌 🧬 or similar]
 color: [color matching your viz: blue, purple, teal, gold...]
+creator_code: [my creator code, if I gave you one — otherwise leave this line out]
 -->
+
+If I give you my ArcadeLab creator code, include it in the header as creator_code: so my work is always published under my name. My code (leave blank if I'm new): ____
 
 The visualization should illustrate: [DESCRIBE THE CONCEPT — what idea, what controls, what should the viewer come away understanding?]
 
@@ -228,7 +240,10 @@ description: [One short sentence]
 libraries: [optional: phaser, p5, matter, etc.]
 emoji: [kid-friendly emoji]
 color: [bright color: red, orange, green, blue, purple, pink, teal, or gold]
+creator_code: [my kid's creator code, if I gave you one — otherwise leave this line out]
 -->
+
+If I give you my kid's ArcadeLab creator code, include it in the header as creator_code: so all their games are published under their name, no matter which device we use. Their code (leave blank if they're new): ____
 
 After building, tell the kid: "Copy this code, then go to arcadelab.ai/publish and paste it. Your game will get its own URL you can share with friends!"
 

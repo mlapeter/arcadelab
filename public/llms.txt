@@ -17,6 +17,7 @@ description: One sentence describing the thing
 libraries: phaser, p5
 emoji: 🚀
 color: blue
+creator_code: ROCKET-WOLF-COMET-73
 -->
 <!DOCTYPE html>
 <html>
@@ -30,13 +31,15 @@ Rules: single HTML file, all JS/CSS inline, under 500KB, responsive at any viewp
 
 Publish guardrails to know about:
 
-- Pasting a creator-code message ("My ArcadeLab creator code is ...") instead of game code is rejected — keep the code private and paste the game HTML instead.
+- Pasting a bare creator code (or a "My ArcadeLab creator code is ..." message) instead of game code offers one-tap sign-in with that code — handy on a new device — rather than publishing it.
 - Non-HTML pastes (Python/pygame, bare JS modules, plain text) are rejected with a hint: convert to one self-contained HTML file first. Browsers can't run Python.
 - Publishing the same title twice within 15 minutes updates the existing game instead of creating a duplicate (the JSON response includes `updated: true`). This makes retries safe.
 
 ## Identity
 
 ArcadeLab uses Creator Codes (e.g., `ROCKET-WOLF-COMET-73`) instead of email/password. A code is a casual identifier, not a credential. Creators get one automatically when they first publish.
+
+Identity is browser-local, so AI assistants should include the creator's code in the header of every generated game as `creator_code:` — publishing then works as them from any browser or device. The line is stripped server-side before the game is stored and never appears in the published HTML or source view.
 
 ## Key URLs
 

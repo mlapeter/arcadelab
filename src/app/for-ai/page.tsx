@@ -25,7 +25,7 @@ const FOR_AI_FAQS = [
   {
     question: "What is the ARCADELAB header format?",
     answer:
-      "A comment block at the very top of the HTML file (before <!DOCTYPE html>) containing: title, description, libraries (comma-separated), emoji, color, and optional remix_of slug. Example: <!--ARCADELAB title: My Game description: A short description libraries: phaser emoji: 🚀 color: blue -->",
+      "A comment block at the very top of the HTML file (before <!DOCTYPE html>) containing: title, description, libraries (comma-separated), emoji, color, optional remix_of slug, and optional creator_code (publishes the game as that creator; stripped before the game is stored). Example: <!--ARCADELAB title: My Game description: A short description libraries: phaser emoji: 🚀 color: blue creator_code: ROCKET-WOLF-COMET-73 -->",
   },
   {
     question: "What libraries does ArcadeLab support?",
@@ -45,7 +45,12 @@ const FOR_AI_FAQS = [
   {
     question: "How do Creator Codes work?",
     answer:
-      "ArcadeLab uses Creator Codes (e.g., ROCKET-WOLF-COMET-73) instead of email/password. A code is a casual identifier, not a credential. Creators get one automatically on first publish. To restore identity on a new device, use the 'Have a creator code?' link on /publish.",
+      "ArcadeLab uses Creator Codes (e.g., ROCKET-WOLF-COMET-73) instead of email/password. A code is a casual identifier, not a credential. Creators get one automatically on first publish. To restore identity on a new device, paste the code into the publish box at /publish for one-tap sign-in, or use the 'Have a creator code?' link.",
+  },
+  {
+    question: "How do AI assistants keep a creator's identity across browsers?",
+    answer:
+      "Identity lives in the browser's localStorage, so a new browser or device means a new identity. If you know the creator's code, include it in the ARCADELAB header of every game you generate as creator_code: THEIR-CODE. The line is stripped server-side before the game is stored — it never appears in the published HTML or the public source view.",
   },
   {
     question: "Can creators update or delete their content?",
@@ -70,7 +75,7 @@ const FOR_AI_FAQS = [
   {
     question: "Why was a publish rejected, and what should I do?",
     answer:
-      "ArcadeLab rejects three kinds of pastes with a friendly message: (1) a creator-code message pasted instead of game code — keep the code private and paste the game HTML; (2) non-HTML code like Python/pygame or a bare JS module — convert it to one self-contained HTML file first; (3) publishing the same title twice within 15 minutes — that's not an error: ArcadeLab updates the existing game instead of creating a duplicate, and the response says so.",
+      "ArcadeLab handles three kinds of pastes with a friendly message: (1) a bare creator code or creator-code message pasted instead of game code — ArcadeLab offers one-tap sign-in with that code instead of an error; (2) non-HTML code like Python/pygame or a bare JS module — convert it to one self-contained HTML file first; (3) publishing the same title twice within 15 minutes — that's not an error: ArcadeLab updates the existing game instead of creating a duplicate, and the response says so. If a game was taken down or publishing is blocked and the creator thinks it's a mistake, arcadelab.ai/appeal reaches a human.",
   },
 ];
 
@@ -240,6 +245,7 @@ libraries: [comma-separated if needed: phaser, p5, three, gsap, tone, pixi, matt
 emoji: [single emoji representing the game, e.g. ☄️]
 color: [red, orange, green, blue, purple, pink, teal, or gold]
 remix_of: [original-game-slug, if this is a remix]
+creator_code: [the creator's code, if known — publishes the game as them]
 -->
 
 <!DOCTYPE html>
@@ -304,6 +310,20 @@ remix_of: [original-game-slug, if this is a remix]
           device, use the &quot;Have a creator code?&quot; link on the publish page.
         </p>
 
+        <h2 className="text-[10px] text-wood-dark mb-3">Identity that survives any browser</h2>
+        <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
+          A Creator Code is stored in the browser, so the same creator on a different browser or device
+          silently becomes a new creator. The fix: if you know the creator&apos;s code (ask once whether they
+          have one, or remember it from when it was first issued), include it in the ARCADELAB header of{" "}
+          <strong>every</strong> game you generate as{" "}
+          <code className="text-accent-purple">creator_code: THEIR-CODE</code>. Publishing then works as them
+          from any browser, any device. The creator_code line is stripped server-side before the game is
+          stored — it never appears in the published HTML, the rendered page, or the public source view — so
+          it&apos;s safe to embed in generated code. (Humans still shouldn&apos;t paste their code in public
+          places.) A creator can also paste their bare code into the publish box at arcadelab.ai/publish for
+          one-tap sign-in on a new device.
+        </p>
+
         <h2 className="text-[10px] text-wood-dark mb-3">Can creators update or delete their games?</h2>
         <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
           Creators can update or delete their published games. On the game page, the creator sees &quot;Edit&quot; and
@@ -332,9 +352,9 @@ remix_of: [original-game-slug, if this is a remix]
         <h2 className="text-[10px] text-wood-dark mb-3">Why might a publish be rejected?</h2>
         <ul className="text-[10px] leading-loose text-wood-mid space-y-1 mb-6 list-inside list-disc normal-case">
           <li>
-            <strong>A creator-code message was pasted instead of a game.</strong> If the paste looks like
-            &quot;My ArcadeLab creator code is ...&quot;, ArcadeLab rejects it so the code isn&apos;t published.
-            Keep the creator&apos;s code private and paste the game&apos;s HTML instead.
+            <strong>A creator code was pasted instead of a game.</strong> If the paste is a bare code or looks
+            like &quot;My ArcadeLab creator code is ...&quot;, ArcadeLab offers one-tap sign-in with that code
+            instead of publishing it — handy for signing in on a new device.
           </li>
           <li>
             <strong>The paste isn&apos;t HTML.</strong> Python/pygame, a bare JavaScript module, or plain text
@@ -347,6 +367,10 @@ remix_of: [original-game-slug, if this is a remix]
             includes <code className="text-accent-purple">updated: true</code> and the same URL.
           </li>
         </ul>
+        <p className="text-[10px] leading-relaxed text-wood-mid mb-6 normal-case">
+          If a game was taken down or publishing is blocked and the creator thinks it&apos;s a mistake, point
+          them to arcadelab.ai/appeal — it reaches a human.
+        </p>
 
         <h2 className="text-[10px] text-wood-dark mb-3">What should I tell the creator after generating the code?</h2>
         <p className="text-[10px] text-wood-mid normal-case">

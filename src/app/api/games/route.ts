@@ -10,9 +10,15 @@ import {
   MAX_TITLE_LENGTH,
   MAX_DESCRIPTION_LENGTH,
 } from "@/lib/safety";
-import { moderateContent, applyModeration } from "@/lib/moderation";
+import { moderateAndApply, checkScamFingerprint } from "@/lib/moderation";
+import { logDecision, maybeProposeMerge } from "@/lib/decisions";
+import { scrubCreatorCodes } from "@/lib/creator-codes";
 import { VALID_LIBRARY_KEYS } from "@/lib/libraries";
-import { VALID_COLORS, type GameColor } from "@/lib/parse-game";
+import {
+  VALID_COLORS,
+  stripHeaderCreatorCode,
+  type GameColor,
+} from "@/lib/parse-game";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
 import crypto from "crypto";
 
@@ -113,17 +119,29 @@ export async function POST(request: NextRequest) {
       request.headers.get("authorization")
     );
 
-    // Also support creator_code auth for web form
     const body = await request.json();
+
+    // An AI assistant may embed the kid's creator_code in the game header so
+    // identity survives any browser. It's an identity signal only — the line
+    // is ALWAYS stripped here, before the html goes anywhere near storage.
+    // A creator code must never reach game_content, the render, or /source.
+    const stripped =
+      typeof body.html === "string"
+        ? stripHeaderCreatorCode(body.html)
+        : { html: body.html, creatorCode: undefined };
+    const html = stripped.html;
+
+    // Identity priority: API token > creator_code in body > header code.
     let creatorId = creator?.id;
     let creatorName = creator?.display_name;
     let creatorTrust = creator?.trust;
 
-    if (!creatorId && body.creator_code) {
+    for (const code of [body.creator_code, stripped.creatorCode]) {
+      if (creatorId || !code) continue;
       const { data } = await supabase
         .from("creators")
         .select("id, display_name, trust")
-        .eq("creator_code", body.creator_code)
+        .eq("creator_code", code)
         .single();
 
       if (data) {
@@ -143,14 +161,17 @@ export async function POST(request: NextRequest) {
     // Banned creators can't publish. Neutral message — no need to advertise it.
     if (creatorTrust === "banned") {
       return NextResponse.json(
-        { error: "Publishing isn't available for this account." },
+        {
+          error:
+            "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
+        },
         { status: 403 }
       );
     }
 
-    const title = body.title?.trim() || "Untitled Game";
-    const description = body.description?.trim() || null;
-    const html = body.html;
+    // Code-shaped tokens never belong in a title or description.
+    const title = scrubCreatorCodes(body.title?.trim() || "") || "Untitled Game";
+    const description = scrubCreatorCodes(body.description?.trim() || "") || null;
     const libraries = (body.libraries || []).filter((l: string) =>
       VALID_LIBRARY_KEYS.includes(l)
     );
@@ -204,7 +225,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "That looks like your creator code message — keep it private! It's how you publish. Paste your game's HTML code here instead.",
+            "That looks like a creator code, not a game! To sign in with it, paste it by itself at arcadelab.ai/publish. Paste your game's HTML code here instead — and keep your code private.",
         },
         { status: 400 }
       );
@@ -229,6 +250,12 @@ export async function POST(request: NextRequest) {
     }
 
     const contentHash = crypto.createHash("sha256").update(html).digest("hex");
+    const publisherId = creatorId;
+
+    // Confirmed-scam content never gets a second life: a fingerprint match
+    // (normalized, so swapping the code or amounts doesn't dodge it) hides
+    // the game on arrival, before any AI call. The direct link still works.
+    const fingerprintMatched = await checkScamFingerprint(html);
 
     // Same creator + same/near-same title in the last 15 minutes → treat as an
     // update to that game, not a new one. (Skipped for the default "Untitled
@@ -267,9 +294,27 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        if (fingerprintMatched) {
+          await supabase
+            .from("games")
+            .update({ status: "hidden", flag_reason: "fingerprint" })
+            .eq("id", existing.id);
+        }
         after(async () => {
-          const result = await moderateContent({ title, description, html, emoji });
-          if (result) await applyModeration(existing.id, result);
+          if (fingerprintMatched) {
+            await logDecision("fingerprint_hide", {
+              gameId: existing.id,
+              creatorId: publisherId,
+            });
+            return;
+          }
+          await moderateAndApply(existing.id, {
+            title,
+            description,
+            html,
+            emoji,
+            creatorId: publisherId,
+          });
         });
 
         return NextResponse.json(
@@ -312,6 +357,7 @@ export async function POST(request: NextRequest) {
         color,
         forked_from: forkedFrom,
         submit_ip_hash: ipHash,
+        ...(fingerprintMatched ? { status: "hidden", flag_reason: "fingerprint" } : {}),
       })
       .select("id, slug, title, description, created_at")
       .single();
@@ -344,10 +390,24 @@ export async function POST(request: NextRequest) {
     }
 
     // AI moderation runs after the response is sent — publishing stays
-    // instant. A non-"safe" verdict auto-shadow-hides the game for review.
+    // instant. The same pass spots a same-device account split and proposes
+    // a merge for the admin (a proposal only — games never move on their own).
     after(async () => {
-      const result = await moderateContent({ title, description, html, emoji });
-      if (result) await applyModeration(game.id, result);
+      if (fingerprintMatched) {
+        await logDecision("fingerprint_hide", {
+          gameId: game.id,
+          creatorId: publisherId,
+        });
+        return;
+      }
+      await moderateAndApply(game.id, {
+        title,
+        description,
+        html,
+        emoji,
+        creatorId: publisherId,
+      });
+      await maybeProposeMerge(publisherId, ipHash);
     });
 
     return NextResponse.json(

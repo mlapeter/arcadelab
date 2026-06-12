@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { rateLimit, getClientIp } from "@/lib/rate-limit";
+import { moderateAndApply } from "@/lib/moderation";
 
 // Distinct viewer reports needed before a game is auto-shadow-hidden.
 // Low, but each report is deduped per session — three different people.
@@ -39,7 +40,7 @@ export async function POST(
 
   const { data: game } = await supabase
     .from("games")
-    .select("id, status, report_count")
+    .select("id, status, report_count, moderation")
     .eq("id", id)
     .single();
 
@@ -73,6 +74,43 @@ export async function POST(
   }
 
   await supabase.from("games").update(update).eq("id", id);
+
+  // Immediate AI re-review — reports should rarely wait for a human. Runs
+  // after the response is sent. A confident 'safe' verdict auto-dismisses the
+  // reports (and undoes the threshold hide above); anything else goes through
+  // the normal trust-weighted moderation actions.
+  // Cooldown: skip if the game was AI-checked in the last hour, so a report
+  // storm on one game can't burn unbounded model calls. Crossing the hide
+  // threshold always re-reviews (it can only happen once — status flips to
+  // hidden) so a falsely-reported game still gets un-hidden promptly.
+  const lastChecked = (game.moderation as { checked_at?: string } | null)?.checked_at;
+  const recentlyChecked =
+    !!lastChecked && Date.now() - new Date(lastChecked).getTime() < 60 * 60 * 1000;
+  const crossedThreshold = newCount >= REPORT_HIDE_THRESHOLD;
+  if (game.status === "active" && (!recentlyChecked || crossedThreshold)) {
+    const reportReason = reason || "No reason given";
+    after(async () => {
+      const { data: full } = await supabase
+        .from("games")
+        .select("title, description, emoji, creator_id")
+        .eq("id", id)
+        .single();
+      const { data: content } = await supabase
+        .from("game_content")
+        .select("html")
+        .eq("game_id", id)
+        .single();
+      if (!full?.creator_id || !content?.html) return;
+      await moderateAndApply(id, {
+        title: full.title,
+        description: full.description,
+        html: content.html,
+        emoji: full.emoji,
+        creatorId: full.creator_id,
+        reportReason,
+      });
+    });
+  }
 
   const response = NextResponse.json({ success: true });
   if (!request.cookies.get("kh_session")) {

@@ -191,9 +191,15 @@ async function computeContentFacts(
   ownCode: string | null
 ): Promise<ContentFacts> {
   const text = [input.title, input.description || "", input.html].join("\n");
-  const codes = findCreatorCodes(text)
-    .filter((c) => c.valid)
-    .map((c) => c.raw);
+  // Count typo'd codes by their correction — a kid mistyping their own code
+  // must still get the own-code protection.
+  const codes = [
+    ...new Set(
+      findCreatorCodes(text)
+        .map((c) => (c.valid ? c.raw : c.suggestion))
+        .filter((c): c is string => !!c)
+    ),
+  ];
   const allCodesOwn =
     codes.length > 0 && !!ownCode && codes.every((c) => c === ownCode);
 

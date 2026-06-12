@@ -95,8 +95,10 @@ export function stripHeaderCreatorCode(html: string): {
       );
       if (!m) return header;
       creatorCode ??= m[1].trim().toUpperCase();
+      // Global flag matters: a confused AI can echo the line twice, and a
+      // non-global replace would leak the second copy into stored HTML.
       return header.replace(
-        /^[ \t]*creator_code:[^\r\n]*?[ \t]*(?=-->)|^[ \t]*creator_code:[^\r\n]*\r?\n?/im,
+        /^[ \t]*creator_code:[^\r\n]*?[ \t]*(?=-->)|^[ \t]*creator_code:[^\r\n]*\r?\n?/gim,
         ""
       );
     }

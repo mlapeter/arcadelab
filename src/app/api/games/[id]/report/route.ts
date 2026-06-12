@@ -40,7 +40,7 @@ export async function POST(
 
   const { data: game } = await supabase
     .from("games")
-    .select("id, status, report_count")
+    .select("id, status, report_count, moderation")
     .eq("id", id)
     .single();
 
@@ -79,7 +79,15 @@ export async function POST(
   // after the response is sent. A confident 'safe' verdict auto-dismisses the
   // reports (and undoes the threshold hide above); anything else goes through
   // the normal trust-weighted moderation actions.
-  if (game.status === "active") {
+  // Cooldown: skip if the game was AI-checked in the last hour, so a report
+  // storm on one game can't burn unbounded model calls. Crossing the hide
+  // threshold always re-reviews (it can only happen once — status flips to
+  // hidden) so a falsely-reported game still gets un-hidden promptly.
+  const lastChecked = (game.moderation as { checked_at?: string } | null)?.checked_at;
+  const recentlyChecked =
+    !!lastChecked && Date.now() - new Date(lastChecked).getTime() < 60 * 60 * 1000;
+  const crossedThreshold = newCount >= REPORT_HIDE_THRESHOLD;
+  if (game.status === "active" && (!recentlyChecked || crossedThreshold)) {
     const reportReason = reason || "No reason given";
     after(async () => {
       const { data: full } = await supabase

@@ -150,10 +150,23 @@ export async function POST(request: NextRequest) {
         }
         const { data: proposal, error: pErr } = await supabase
           .from("moderation_decisions")
-          .select("data")
+          .select("creator_id, data")
           .eq("id", decisionId)
           .single();
         if (pErr || !proposal) return unavailable("Couldn't load that proposal");
+        // The proposal is the source of truth — the request may only pick the
+        // direction, never which accounts get merged.
+        const pair = [
+          proposal.creator_id,
+          (proposal.data as { other_creator_id?: string })?.other_creator_id,
+        ];
+        if (
+          !pair.includes(fromCreatorId) ||
+          !pair.includes(toCreatorId) ||
+          fromCreatorId === toCreatorId
+        ) {
+          return badRequest("Creators don't match that proposal");
+        }
 
         const { data: moved } = await supabase
           .from("games")

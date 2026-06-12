@@ -375,7 +375,9 @@ function parseResult(text: string): ModerationResult | null {
       verdict,
       quality,
       confidence,
-      note: typeof raw.note === "string" ? raw.note.slice(0, 200) : "",
+      // Scrubbed like description: the note flows into stored moderation
+      // JSON, memory cases, and admin email — never with a real code in it.
+      note: typeof raw.note === "string" ? scrubCreatorCodes(raw.note).slice(0, 200) : "",
     };
     if (typeof raw.description === "string" && raw.description.trim()) {
       // The prompt's context block contains the submitter's real code — make

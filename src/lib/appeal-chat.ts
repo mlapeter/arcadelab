@@ -557,7 +557,11 @@ export async function applyOutcome(
     }
 
     if (resolve === "unban") {
-      if (!subject?.creatorId) resolve = "escalate";
+      // Un-banning is identity-gated: only the code proves you own the account.
+      // A public game link is paste-able by anyone, so a link-only subject can
+      // never auto-unban — it goes to a human. (The verdict prompt also leans
+      // this way, but the guarantee lives here, not in the model.)
+      if (!subject?.creatorId || subject.via !== "code") resolve = "escalate";
       else {
         const evidence = await creatorScamEvidence(subject.creatorId);
         if (!evidence.verified || evidence.fingerprintMatch || evidence.confirmedRemoval) {

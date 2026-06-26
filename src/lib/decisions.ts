@@ -14,7 +14,9 @@ export type DecisionKind =
   | "merge_proposal" // AI proposes moving games between same-kid accounts (pending)
   | "merge" // admin-approved merge (logs moved game ids for unmerge)
   | "ip_flag" // creator shares an IP with a confirmed scammer (review, never auto-ban)
-  | "fingerprint_hide"; // content matched a confirmed-scam fingerprint
+  | "fingerprint_hide" // content matched a confirmed-scam fingerprint
+  | "appeal_resolve" // appeals chat restored/unbanned on its own (reversible)
+  | "appeal_escalation"; // appeals chat punted to the admin (pending)
 
 export interface DecisionInput {
   gameId?: string | null;

@@ -5,6 +5,7 @@ import { parseGameHeader, type ParsedGame } from "@/lib/parse-game";
 import { isCreatorCodeMessage } from "@/lib/safety";
 import { extractPastedCode, suggestCreatorCode, type DetectedCode } from "@/lib/creator-codes";
 import { getCreatorIdentity, saveCreatorIdentity, type CreatorIdentity } from "@/lib/identity";
+import BanPanel from "@/components/BanPanel";
 
 type Phase = "paste" | "welcome" | "confirm" | "success";
 
@@ -89,6 +90,7 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
   // UI
   const [phase, setPhase] = useState<Phase>("paste");
   const [error, setError] = useState("");
+  const [banned, setBanned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [creatingAccount, setCreatingAccount] = useState(false);
   const [publishResult, setPublishResult] = useState<PublishResult | null>(null);
@@ -453,7 +455,11 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (data.banned) {
+        setBanned(true); // friendly ban panel instead of a scary red box
+        return;
+      }
+      if (!res.ok || data.error) {
         const msg = data.warnings ? `${data.error}: ${data.warnings.join(", ")}` : data.error || "Failed to publish";
         setError(msg);
         return;
@@ -498,7 +504,11 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
 
       const data = await res.json();
 
-      if (!res.ok) {
+      if (data.banned) {
+        setBanned(true);
+        return;
+      }
+      if (!res.ok || data.error) {
         const msg = data.warnings ? `${data.error}: ${data.warnings.join(", ")}` : data.error || "Failed to update";
         setError(msg);
         return;
@@ -849,7 +859,9 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
           </p>
         )}
 
-        {error && (
+        {banned && <BanPanel creatorCode={identity?.creator_code} />}
+
+        {error && !banned && (
           <div className="rpg-panel p-3">
             <ErrorMessage message={error} />
           </div>
@@ -858,7 +870,7 @@ export default function PublishForm({ updateSlug, remixOfSlug }: { updateSlug?: 
         {/* Publish/Update button */}
         <button
           onClick={updateSlug ? handleUpdate : handlePublish}
-          disabled={loading || !identity}
+          disabled={loading || !identity || banned}
           className="rpg-btn rpg-btn-green w-full px-6 py-5 text-xs disabled:opacity-50"
         >
           {loading

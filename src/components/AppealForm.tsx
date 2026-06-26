@@ -1,15 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import AppealChat from "@/components/AppealChat";
 
 const MAX_CONTACT = 200;
 const MAX_MESSAGE = 500;
 
-export default function AppealForm() {
-  const [contact, setContact] = useState("");
+export default function AppealForm({
+  initialContact = "",
+  autoChat = false,
+}: {
+  initialContact?: string;
+  autoChat?: boolean;
+}) {
+  const [contact, setContact] = useState(initialContact);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "done">("idle");
   const [error, setError] = useState("");
+  const [appealId, setAppealId] = useState<string | undefined>(undefined);
+  const [chatting, setChatting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +33,9 @@ export default function AppealForm() {
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.success) {
+        if (typeof data.appealId === "string") setAppealId(data.appealId);
         setState("done");
+        if (autoChat) setChatting(true);
       } else {
         setError(data?.error || "Something went wrong — try again in a minute!");
         setState("idle");
@@ -37,11 +48,28 @@ export default function AppealForm() {
 
   if (state === "done") {
     return (
-      <div className="rpg-panel p-6 text-center space-y-3">
-        <div className="text-4xl">💛</div>
-        <p className="text-[10px] text-accent-green normal-case">
-          Got it! A real human will read this soon.
-        </p>
+      <div className="space-y-4">
+        <div className="rpg-panel p-6 text-center space-y-3">
+          <div className="text-4xl">💛</div>
+          <p className="text-[10px] text-accent-green normal-case">
+            Got it! A real human will read this soon.
+          </p>
+          {!chatting && (
+            <>
+              <p className="text-[10px] text-parchment/60 normal-case">
+                Want to try sorting it out right now?
+              </p>
+              <button
+                type="button"
+                onClick={() => setChatting(true)}
+                className="rpg-btn rpg-btn-gold px-6 py-3 text-[10px]"
+              >
+                💬 Chat with our helper
+              </button>
+            </>
+          )}
+        </div>
+        {chatting && <AppealChat contact={contact.trim()} appealId={appealId} />}
       </div>
     );
   }

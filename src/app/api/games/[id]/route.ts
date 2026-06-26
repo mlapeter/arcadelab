@@ -94,15 +94,15 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    // Banned creators can't publish updates either. Neutral message.
+    // Banned creators can't publish updates either. Neutral message — 200 +
+    // error like other expected outcomes, so the web form's ban panel renders
+    // without a console error.
     if (creatorTrust === "banned") {
-      return NextResponse.json(
-        {
-          error:
-            "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({
+        error:
+          "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
+        banned: true,
+      });
     }
 
     // Verify game exists and creator owns it

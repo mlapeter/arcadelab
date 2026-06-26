@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { supabase } from "@/lib/supabase";
 import AdminGameActions from "@/components/AdminGameActions";
 import AdminDecisionActions from "@/components/AdminDecisionActions";
+import AdminLessonsPanel from "@/components/AdminLessonsPanel";
 
 // The moderation feed must never be indexed or crawled.
 export const metadata: Metadata = {
@@ -51,6 +52,8 @@ const KIND_LABEL: Record<string, string> = {
   merge: "Merged accounts",
   merge_proposal: "Merge proposal",
   ip_flag: "IP flag",
+  appeal_resolve: "Appeal resolved by chat",
+  appeal_escalation: "Appeal escalated",
 };
 
 // Per-kind one-click reverse. Kinds not listed (e.g. an accepted
@@ -63,6 +66,7 @@ const REVERSE_BUTTON: Record<string, string> = {
   fingerprint_hide: "↩ Un-hide game",
   report_dismiss: "↩ Reopen reports",
   merge: "↩ Unmerge",
+  appeal_resolve: "↩ Reverse appeal outcome",
 };
 
 function when(iso: string) {
@@ -77,6 +81,23 @@ function when(iso: string) {
 /** One audit line: what the model saw and said, per decision kind. */
 function decisionWhy(kind: string, data: Record<string, unknown>): string {
   const parts: string[] = [];
+  // Memory-driven decisions say exactly what they learned from, so the admin
+  // can audit (and reverse — which un-teaches) what the system has learned.
+  if (kind === "fingerprint_hide" && data.memory) {
+    const when = data.recorded_at
+      ? new Date(String(data.recorded_at)).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      : null;
+    parts.push(
+      `🧠 matched fingerprint from "${data.source_title || "a confirmed scam"}"${when ? `, ${when}` : ""}`
+    );
+  }
+  if (kind === "appeal_resolve" || kind === "appeal_escalation") {
+    if (data.action) parts.push(`chat action: ${data.action}`);
+    if (data.claim) parts.push(`claim: "${data.claim}"`);
+  }
   if (kind === "merge" && data.from_name && data.to_name) {
     const moved = (data.moved_game_ids as string[] | undefined)?.length || 0;
     parts.push(`${data.from_name} → ${data.to_name} (${moved} game${moved === 1 ? "" : "s"})`);
@@ -160,11 +181,39 @@ export default async function AdminPage({ searchParams }: Props) {
     .from("moderation_decisions")
     .select("id, kind, game_id, creator_id, data, status, created_at")
     .eq("status", "pending")
-    .in("kind", ["merge_proposal", "ip_flag"])
+    .in("kind", ["merge_proposal", "ip_flag", "appeal_escalation"])
     .order("created_at", { ascending: false });
   const pending = (pendingData || []) as DecisionRow[];
   const mergeProposals = pending.filter((d) => d.kind === "merge_proposal");
   const ipFlags = pending.filter((d) => d.kind === "ip_flag");
+  const escalations = pending.filter((d) => d.kind === "appeal_escalation");
+
+  // The lessons panel: what the system currently believes, and how much
+  // ground truth it rests on. All degrade to empty pre-migration.
+  let lessons: string | null = null;
+  let caseCount = 0;
+  let fingerprintCount = 0;
+  {
+    const { data: lessonRows } = await supabase
+      .from("moderation_memory")
+      .select("content")
+      .eq("kind", "lesson")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    lessons =
+      ((lessonRows?.[0]?.content as { text?: string } | undefined)?.text as string) ||
+      null;
+    const { count: cc } = await supabase
+      .from("moderation_memory")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "case");
+    const { count: fc } = await supabase
+      .from("moderation_memory")
+      .select("id", { count: "exact", head: true })
+      .eq("kind", "fingerprint");
+    caseCount = cc || 0;
+    fingerprintCount = fc || 0;
+  }
 
   const { data: appealsData } = await supabase
     .from("appeals")
@@ -197,9 +246,11 @@ export default async function AdminPage({ searchParams }: Props) {
   // Creator names + ban state for queue and feed rows.
   const creatorIds = [
     ...new Set(
-      [...queue.map((g) => g.creator_id), ...feed.map((d) => d.creator_id)].filter(
-        Boolean
-      ) as string[]
+      [
+        ...queue.map((g) => g.creator_id),
+        ...feed.map((d) => d.creator_id),
+        ...escalations.map((d) => d.creator_id),
+      ].filter(Boolean) as string[]
     ),
   ];
   const creatorMap: Record<string, { name: string; trust: string }> = {};
@@ -243,7 +294,8 @@ export default async function AdminPage({ searchParams }: Props) {
     }
   }
 
-  const needsYou = mergeProposals.length + ipFlags.length + appeals.length + queue.length;
+  const needsYou =
+    mergeProposals.length + ipFlags.length + escalations.length + appeals.length + queue.length;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8">
@@ -353,6 +405,49 @@ export default async function AdminPage({ searchParams }: Props) {
             )}
           </div>
         ))}
+
+        {escalations.map((d) => {
+          const creator = d.creator_id ? creatorMap[d.creator_id] : null;
+          return (
+            <div key={d.id} className="rpg-panel p-4">
+              <p className="text-[10px] text-wood-dark mb-1">
+                🚨 Appeal escalated{creator ? `: ${creator.name}` : ""}
+                {creator?.trust === "banned" && (
+                  <span className="text-accent-red"> · BANNED</span>
+                )}
+              </p>
+              <p className="text-[10px] text-wood-mid/70 normal-case mb-2">
+                {String(d.data.reason || "The chat helper wanted a human to look.")} ·{" "}
+                {when(d.created_at)}
+              </p>
+              {!!d.data.claim && (
+                <p className="text-[10px] text-wood-mid normal-case mb-3">
+                  Their claim: &ldquo;{String(d.data.claim)}&rdquo;
+                </p>
+              )}
+              <AdminDecisionActions
+                adminKey={secret}
+                buttons={[
+                  ...(d.creator_id && creator?.trust === "banned"
+                    ? [
+                        {
+                          label: "↩ Un-ban creator",
+                          action: "unban",
+                          tone: "green" as const,
+                          payload: { creatorId: d.creator_id, decisionId: d.id },
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "✓ Handled",
+                    action: "dismiss_decision",
+                    payload: { decisionId: d.id },
+                  },
+                ]}
+              />
+            </div>
+          );
+        })}
 
         {appeals.map((a) => (
           <div key={a.id} className="rpg-panel p-4">
@@ -465,6 +560,14 @@ export default async function AdminPage({ searchParams }: Props) {
           );
         })}
       </div>
+
+      {/* ===== What the system has learned ===== */}
+      <AdminLessonsPanel
+        adminKey={secret}
+        lessons={lessons}
+        caseCount={caseCount}
+        fingerprintCount={fingerprintCount}
+      />
 
       {/* ===== AI decisions: audit + one-click reverse ===== */}
       <h2 className="text-[11px] text-wood-dark mb-1">AI decisions</h2>

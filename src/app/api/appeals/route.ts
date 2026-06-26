@@ -42,12 +42,17 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const { error } = await supabase.from("appeals").insert({ contact, message });
+  const { data, error } = await supabase
+    .from("appeals")
+    .insert({ contact, message })
+    .select("id")
+    .single();
   if (error) {
     // The appeals table may not exist yet (migration pending) — degrade
     // kindly, never crash.
     return NextResponse.json({ error: "Appeals are warming up — try again soon!" });
   }
 
-  return NextResponse.json({ success: true });
+  // appealId lets the chat helper resolve this appeal if it sorts things out.
+  return NextResponse.json({ success: true, appealId: data?.id });
 }

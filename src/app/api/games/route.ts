@@ -159,15 +159,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Banned creators can't publish. Neutral message — no need to advertise it.
+    // Banned creators can't publish. Neutral message — no need to advertise
+    // it. banned:true lets the web form swap in the friendly ban panel with
+    // its one-tap appeal. An expected kid-facing outcome, so 200 + error
+    // (keeps the browser console clean, same pattern as the appeals form).
     if (creatorTrust === "banned") {
-      return NextResponse.json(
-        {
-          error:
-            "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
-        },
-        { status: 403 }
-      );
+      return NextResponse.json({
+        error:
+          "Publishing isn't available for this account. Think this was a mistake? Tell us at arcadelab.ai/appeal",
+        banned: true,
+      });
     }
 
     // A direct API publish may send just { html } — the ARCADELAB header is
@@ -316,6 +317,7 @@ export async function POST(request: NextRequest) {
             await logDecision("fingerprint_hide", {
               gameId: existing.id,
               creatorId: publisherId,
+              data: { memory: true, ...fingerprintMatched },
             });
             return;
           }
@@ -408,6 +410,7 @@ export async function POST(request: NextRequest) {
         await logDecision("fingerprint_hide", {
           gameId: game.id,
           creatorId: publisherId,
+          data: { memory: true, ...fingerprintMatched },
         });
         return;
       }

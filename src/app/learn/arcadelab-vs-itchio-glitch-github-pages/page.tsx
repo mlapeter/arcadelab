@@ -43,7 +43,7 @@ const FAQS = [
   {
     question: "When should I use ArcadeLab instead of another platform?",
     answer:
-      "Use ArcadeLab when your thing fits in one HTML file under 500KB, you don't need server-side code or external API calls, and you want the lowest possible friction to publish.",
+      "Use ArcadeLab when your thing fits in one HTML file under 750KB, you don't need server-side code or external API calls, and you want the lowest possible friction to publish.",
   },
 ];
 
@@ -52,7 +52,7 @@ export default function Page() {
     <ArticleLayout article={article} faqs={FAQS}>
       <QuickAnswer>
         <Link href="/" className="text-accent-purple underline">ArcadeLab</Link> wins when
-        your thing fits in one HTML file under 500KB and you want zero-friction publishing
+        your thing fits in one HTML file under 750KB and you want zero-friction publishing
         with no account. itch.io wins for monetization and larger multi-file games.
         GitHub Pages wins when you already have a repo. Glitch wins when you need a
         backend. CodePen wins for live editing and snippets.
@@ -143,7 +143,7 @@ export default function Page() {
         When ArcadeLab is the right choice
       </h2>
       <ul className="list-disc list-inside space-y-1 my-3">
-        <li>You have a single-file HTML game or visualization under 500KB</li>
+        <li>You have a single-file HTML game or visualization under 750KB</li>
         <li>You want to publish in seconds, not minutes</li>
         <li>You don&apos;t want to create an account</li>
         <li>Your audience is kids, students, or non-developers</li>
@@ -159,7 +159,7 @@ export default function Page() {
         <li>You need a backend or database — use <strong>Glitch</strong> or your own hosting</li>
         <li>Your game needs to load assets at runtime from a CDN — use <strong>itch.io</strong> or <strong>GitHub Pages</strong></li>
         <li>You&apos;re showcasing a tiny snippet for code-sharing — use <strong>CodePen</strong></li>
-        <li>Your game is larger than 500KB — use <strong>itch.io</strong></li>
+        <li>Your game is larger than 750KB — use <strong>itch.io</strong></li>
         <li>You want commenting and rating features — use <strong>itch.io</strong> or <strong>Newgrounds</strong></li>
       </ul>
 

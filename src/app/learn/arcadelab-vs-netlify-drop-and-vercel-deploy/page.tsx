@@ -147,7 +147,7 @@ export default function Page() {
         When to use which
       </h2>
       <ul className="list-disc list-inside space-y-1 my-3">
-        <li><strong>ArcadeLab</strong> — one HTML file under 500KB, no backend, you want zero setup</li>
+        <li><strong>ArcadeLab</strong> — one HTML file under 750KB, no backend, you want zero setup</li>
         <li><strong>Netlify Drop</strong> — a small multi-file static site, you want a free subdomain</li>
         <li><strong>Vercel / Netlify (full)</strong> — production site, multiple environments, custom domain, team workflow</li>
         <li><strong>GitHub Pages</strong> — already have a GitHub repo, want zero infra</li>

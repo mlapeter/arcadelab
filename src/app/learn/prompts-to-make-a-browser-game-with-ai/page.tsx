@@ -29,7 +29,7 @@ Requirements:
 - Use the canvas API and draw everything with shapes (no image files).
 - Make the canvas fill the window and resize with it.
 - Do not use fetch, network requests, or external assets.
-- Keep the whole file under 500KB.`;
+- Keep the whole file under 750KB.`;
 
 const FAQS = [
   {

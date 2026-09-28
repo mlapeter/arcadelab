@@ -55,7 +55,7 @@ const HOW_TO = {
     {
       name: "Get one complete HTML file from your AI",
       text:
-        "Ask the AI for a single self-contained HTML file with all JavaScript and CSS inline. Tell it the file size limit is 500KB. Tell it that fetch, XHR, and WebSocket are blocked, so it should not call external APIs.",
+        "Ask the AI for a single self-contained HTML file with all JavaScript and CSS inline. Tell it the file size limit is 750KB. Tell it that fetch, XHR, and WebSocket are blocked, so it should not call external APIs.",
     },
     {
       name: "Add the ARCADELAB header at the top",
@@ -104,7 +104,7 @@ export default function Page() {
         <li>Toys, art, music makers — anything playful</li>
       </ul>
       <p>
-        If it&apos;s one HTML file under 500KB that doesn&apos;t need to call an external API,
+        If it&apos;s one HTML file under 750KB that doesn&apos;t need to call an external API,
         it works.
       </p>
 
@@ -118,7 +118,7 @@ export default function Page() {
       <blockquote className="border-l-4 border-accent-purple pl-4 my-3 italic">
         &quot;Give me a single self-contained HTML file. All JavaScript and CSS should be
         inline. Don&apos;t use fetch, XHR, or WebSocket — the page can&apos;t make network
-        requests. Keep the whole file under 500KB.&quot;
+        requests. Keep the whole file under 750KB.&quot;
       </blockquote>
       <p>
         If the AI gives you something that imports external files or makes API calls, ask it

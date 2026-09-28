@@ -124,7 +124,7 @@ const HOMEPAGE_FAQS = [
   {
     question: "What's the file size limit?",
     answer:
-      "500KB per single HTML file, including all inline JavaScript and CSS.",
+      "750KB per single HTML file, including all inline JavaScript and CSS.",
   },
   {
     question: "Can ArcadeLab games make network requests?",
@@ -256,7 +256,7 @@ color: blue
         <ul>
           <li>Must be a single, self-contained HTML file</li>
           <li>All JavaScript and CSS must be inline (no external files except declared libraries)</li>
-          <li>Maximum file size: 500KB</li>
+          <li>Maximum file size: 750KB</li>
           <li>Game should work at any viewport size (many creators use tablets)</li>
           <li>
             Games run in a sandboxed iframe with connect-src none — fetch(), XMLHttpRequest, and WebSocket are all
@@ -279,7 +279,7 @@ color: blue
           <li>Build the game as a single HTML file with all JS and CSS inline</li>
           <li>Add the ARCADELAB comment header at the very top (before the DOCTYPE)</li>
           <li>List any supported libraries in the header — do NOT include CDN script tags in the HTML</li>
-          <li>Keep it under 500KB and make it work at any screen size</li>
+          <li>Keep it under 750KB and make it work at any screen size</li>
           <li>Do not use fetch, XHR, or WebSocket — network access is blocked in the sandbox</li>
           <li>Tell the creator to copy the entire code and paste it at arcadelab.ai/publish</li>
         </ol>

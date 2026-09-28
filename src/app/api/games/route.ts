@@ -6,7 +6,7 @@ import {
   scanGameContent,
   isCreatorCodeMessage,
   explainNotHtml,
-  MAX_HTML_SIZE,
+  htmlTooLargeMessage,
   MAX_TITLE_LENGTH,
   MAX_DESCRIPTION_LENGTH,
 } from "@/lib/safety";
@@ -225,11 +225,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (new TextEncoder().encode(html).length > MAX_HTML_SIZE) {
-      return NextResponse.json(
-        { error: "Game code is too large (max 500KB)" },
-        { status: 400 }
-      );
+    const tooLarge = htmlTooLargeMessage(html);
+    if (tooLarge) {
+      return NextResponse.json({ error: tooLarge }, { status: 400 });
     }
 
     // A pasted creator-code message isn't a game — and must never be echoed back.

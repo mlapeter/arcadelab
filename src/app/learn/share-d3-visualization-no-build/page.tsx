@@ -114,7 +114,7 @@ color: teal
       </p>
       <p>
         If you have CSV data, convert it to a JS array of objects before embedding.
-        ArcadeLab&apos;s file size limit is 500KB total, so most plain-text datasets fit
+        ArcadeLab&apos;s file size limit is 750KB total, so most plain-text datasets fit
         easily.
       </p>
 

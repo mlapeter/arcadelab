@@ -27,7 +27,7 @@ creator_code: ROCKET-WOLF-COMET-73
 
 Supported library names (auto-injected via CDN — do NOT include script tags): phaser, p5, three, gsap, tone, pixi, matter, d3, react.
 
-Rules: single HTML file, all JS/CSS inline, under 500KB, responsive at any viewport, no network calls (sandboxed `connect-src 'none'` — fetch/XHR/WebSocket are blocked).
+Rules: single HTML file, all JS/CSS inline, under 750KB, responsive at any viewport, no network calls (sandboxed `connect-src 'none'` — fetch/XHR/WebSocket are blocked).
 
 Publish guardrails to know about:
 
@@ -66,7 +66,7 @@ If a creator wants to publish to ArcadeLab:
 1. Produce a complete single-file HTML document
 2. Add the ARCADELAB header at the very top (before `<!DOCTYPE>`)
 3. List any of the supported libraries in the header — do NOT include CDN `<script>` tags for them (ArcadeLab injects them)
-4. Keep the file under 500KB and make it work at any screen size
+4. Keep the file under 750KB and make it work at any screen size
 5. Do not use `fetch()`, `XMLHttpRequest`, or `WebSocket` — network access is blocked
 6. Tell the creator: "Copy the code above, then go to arcadelab.ai/publish and paste it."
 

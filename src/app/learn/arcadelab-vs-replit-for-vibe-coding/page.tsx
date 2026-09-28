@@ -28,7 +28,7 @@ const FAQS = [
   {
     question: "Which is free?",
     answer:
-      "Both have free tiers. Replit's free tier limits compute and sleeps unused projects. ArcadeLab is fully free with no tier — but only hosts single-file HTML up to 500KB, no backend.",
+      "Both have free tiers. Replit's free tier limits compute and sleeps unused projects. ArcadeLab is fully free with no tier — but only hosts single-file HTML up to 750KB, no backend.",
   },
   {
     question: "Can I use Replit to build, then publish to ArcadeLab?",

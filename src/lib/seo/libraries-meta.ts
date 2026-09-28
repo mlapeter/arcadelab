@@ -101,7 +101,7 @@ export const LIBRARIES_META: Record<string, LibraryMeta> = {
       {
         question: "Is there a file size limit?",
         answer:
-          "500KB per HTML file. Phaser itself is loaded from CDN separately and doesn't count toward your file size. Most procedurally-generated Phaser games come in well under 100KB.",
+          "750KB per HTML file. Phaser itself is loaded from CDN separately and doesn't count toward your file size. Most procedurally-generated Phaser games come in well under 100KB.",
       },
       {
         question: "Can I monetize a Phaser game published on ArcadeLab?",

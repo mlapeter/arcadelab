@@ -35,7 +35,7 @@ const FOR_AI_FAQS = [
   {
     question: "What are the rules for ArcadeLab content?",
     answer:
-      "Single self-contained HTML file. All JavaScript and CSS inline. Maximum 500KB. Must work at any screen size. No network requests (fetch, XHR, WebSocket are blocked by the iframe sandbox).",
+      "Single self-contained HTML file. All JavaScript and CSS inline. Maximum 750KB. Must work at any screen size. No network requests (fetch, XHR, WebSocket are blocked by the iframe sandbox).",
   },
   {
     question: "Can ArcadeLab content access the network?",
@@ -269,7 +269,7 @@ creator_code: [the creator's code, if known — publishes the game as them]
             Do NOT include CDN script tags for supported libraries — ArcadeLab injects them automatically. Including your
             own will cause double-loading and errors.
           </li>
-          <li>Keep the game under 500KB total</li>
+          <li>Keep the game under 750KB total</li>
           <li>The game should work at any screen size (many creators use tablets)</li>
           <li>Pick an emoji and color that match your game&apos;s theme</li>
         </ul>

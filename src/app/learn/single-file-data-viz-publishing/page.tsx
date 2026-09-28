@@ -37,7 +37,7 @@ const FAQS = [
   {
     question: "How big can the file be?",
     answer:
-      "ArcadeLab accepts single HTML files up to 500KB. Chart code is small; the data is what grows. If a dataset is too large, summarize or sample it before embedding.",
+      "ArcadeLab accepts single HTML files up to 750KB. Chart code is small; the data is what grows. If a dataset is too large, summarize or sample it before embedding.",
   },
   {
     question: "Can I embed the visualization in an article?",
@@ -120,7 +120,7 @@ export default function Page() {
       </h2>
       <p>
         Chart code is small; data is what grows. If a dataset pushes the file
-        past 500KB, sample it, round long decimals, or aggregate to the level the
+        past 750KB, sample it, round long decimals, or aggregate to the level the
         chart actually shows. A visualization rarely needs every raw row — it
         needs the shape of the data, and the shape compresses well.
       </p>

@@ -43,7 +43,7 @@ const FAQS = [
   {
     question: "What's the size limit?",
     answer:
-      "500KB per HTML file. That's plenty for a complete game — most fit easily under 100KB.",
+      "750KB per HTML file. That's plenty for a complete game — most fit easily under 100KB.",
   },
 ];
 
@@ -140,7 +140,7 @@ color: orange
       </p>
 
       <h2 className="text-xs text-wood-dark mt-6 mb-2 normal-case font-semibold">
-        What if my game grows past 500KB?
+        What if my game grows past 750KB?
       </h2>
       <p>
         If you&apos;re publishing AI-generated content, you almost certainly won&apos;t hit

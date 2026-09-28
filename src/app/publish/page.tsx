@@ -17,7 +17,7 @@ const PUBLISH_HOW_TO = howToSchema({
   steps: [
     {
       name: "Create a single-file HTML document",
-      text: "Make or generate a complete, self-contained HTML file. Put all JavaScript and CSS inline. Keep it under 500KB. Do not use fetch, XHR, or WebSocket — network access is blocked.",
+      text: "Make or generate a complete, self-contained HTML file. Put all JavaScript and CSS inline. Keep it under 750KB. Do not use fetch, XHR, or WebSocket — network access is blocked.",
     },
     {
       name: "Add the ARCADELAB header",
@@ -89,7 +89,7 @@ creator_code: ROCKET-WOLF-COMET-73
 
         <h2>What are the requirements for an ArcadeLab game?</h2>
         <p>
-          Single HTML file, all JS/CSS inline, max 500KB. Games run in a sandboxed iframe with
+          Single HTML file, all JS/CSS inline, max 750KB. Games run in a sandboxed iframe with
           connect-src none — fetch(), XMLHttpRequest, and WebSocket are all blocked.
         </p>
 

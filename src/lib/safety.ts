@@ -179,7 +179,14 @@ export function detectInfiniteLoops(html: string): string[] {
   return warnings;
 }
 
-export const MAX_HTML_SIZE = 500 * 1024; // 500 KB
+export const MAX_HTML_SIZE = 750 * 1024; // 750 KB
+
+/** Kid-friendly "too big" message, or null if the HTML fits. */
+export function htmlTooLargeMessage(html: string): string | null {
+  const bytes = new TextEncoder().encode(html).length;
+  if (bytes <= MAX_HTML_SIZE) return null;
+  return `Your game is ${Math.ceil(bytes / 1024)}KB, but the limit is ${MAX_HTML_SIZE / 1024}KB. Try asking your AI to make it smaller (shorter code, smaller images).`;
+}
 export const MAX_TITLE_LENGTH = 60;
 export const MAX_DESCRIPTION_LENGTH = 280;
 

@@ -38,7 +38,7 @@ const FAQS = [
   {
     question: "Can I use p5.sound or other p5 add-ons?",
     answer:
-      "Currently only the p5.js core library is auto-injected. If you need p5.sound or other add-ons, those would need to be inlined as part of your HTML — but they may exceed the 500KB limit.",
+      "Currently only the p5.js core library is auto-injected. If you need p5.sound or other add-ons, those would need to be inlined as part of your HTML — but they may exceed the 750KB limit.",
   },
   {
     question: "Can my p5 sketch load images?",

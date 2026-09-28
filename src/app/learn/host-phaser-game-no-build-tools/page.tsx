@@ -43,7 +43,7 @@ const FAQS = [
   {
     question: "What's the size limit for a Phaser game on ArcadeLab?",
     answer:
-      "500KB for the HTML file. Phaser itself is loaded separately from CDN — it doesn't count toward your file size. Asset-heavy games may need to use base64-encoded sprites carefully.",
+      "750KB for the HTML file. Phaser itself is loaded separately from CDN — it doesn't count toward your file size. Asset-heavy games may need to use base64-encoded sprites carefully.",
   },
 ];
 
@@ -137,7 +137,7 @@ color: purple
         &quot;Make a Phaser game as a single self-contained HTML file. Don&apos;t include
         the Phaser CDN script tag — ArcadeLab loads it. Put an <code>&lt;!--ARCADELAB&gt;</code>{" "}
         header at the top with <code>libraries: phaser</code>. All JS inline. No fetch, no
-        external assets. Generate sprites procedurally. Keep it under 500KB.&quot;
+        external assets. Generate sprites procedurally. Keep it under 750KB.&quot;
       </blockquote>
       <p>
         Or just point the AI at{" "}

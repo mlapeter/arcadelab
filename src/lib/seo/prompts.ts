@@ -50,7 +50,7 @@ export const PROMPTS: PromptMeta[] = [
 
 Requirements:
 - All JavaScript and CSS inline; no external files
-- File under 500KB total
+- File under 750KB total
 - Must work at any viewport size — use Phaser.Scale.RESIZE or equivalent
 - No network calls — no fetch, XHR, or WebSocket
 - Generate any sprites procedurally with add.graphics() or make.graphics(); no image URLs
@@ -91,7 +91,7 @@ Output the complete HTML file. After the code, tell me: "Copy all the code above
 
 Requirements:
 - All JavaScript and CSS inline; no external files
-- File under 500KB
+- File under 750KB
 - Use createCanvas(windowWidth, windowHeight) so it works at any viewport
 - No network calls — generate visuals procedurally
 - Use p5's global mode (setup, draw functions at top level)
@@ -133,7 +133,7 @@ Output the complete HTML file. After, tell me: "Copy the code, then go to arcade
 
 Requirements:
 - All JavaScript and CSS inline; no external files
-- File under 500KB
+- File under 750KB
 - Responsive — listen for window resize and update camera.aspect, renderer.setSize
 - No network calls — build all geometry procedurally with Three.js primitives (BoxGeometry, SphereGeometry, etc.)
 - No external models or textures — use MeshBasicMaterial / MeshStandardMaterial with solid colors or procedural CanvasTextures
@@ -176,7 +176,7 @@ Use the 2D canvas API or D3.js (or both). If using D3, add "libraries: d3" to th
 
 Requirements:
 - All JavaScript and CSS inline; no external files
-- File under 500KB
+- File under 750KB
 - Works at any viewport size (responsive)
 - No network calls — embed any data inline as JavaScript constants or generate procedurally
 - Polished visual design: thoughtful color palette, clear typography, smooth animations
@@ -227,7 +227,7 @@ The game should be:
 Technical requirements:
 - Single self-contained HTML file
 - All JavaScript and CSS inline
-- File under 500KB
+- File under 750KB
 - Works on iPad, phone, AND desktop
 - No network calls — generate sprites procedurally or use emoji as graphics
 - If using a library (phaser, p5, matter for physics), list it in the ARCADELAB header

@@ -5,7 +5,7 @@ import {
   scanGameContent,
   isCreatorCodeMessage,
   explainNotHtml,
-  MAX_HTML_SIZE,
+  htmlTooLargeMessage,
   MAX_TITLE_LENGTH,
   MAX_DESCRIPTION_LENGTH,
 } from "@/lib/safety";
@@ -125,8 +125,9 @@ export async function PUT(
       return NextResponse.json({ error: "Game HTML is required" }, { status: 400 });
     }
 
-    if (new TextEncoder().encode(html).length > MAX_HTML_SIZE) {
-      return NextResponse.json({ error: "Game code is too large (max 500KB)" }, { status: 400 });
+    const tooLarge = htmlTooLargeMessage(html);
+    if (tooLarge) {
+      return NextResponse.json({ error: tooLarge }, { status: 400 });
     }
 
     // Same friendly guards as publish: no creator-code messages, no non-HTML.

@@ -30,7 +30,7 @@ Requirements:
 - Use SVG or the canvas API; if you use a library, use D3.
 - Make the chart resize to fit the window.
 - Label the axes and the slider clearly.
-- Keep the whole file under 500KB.`;
+- Keep the whole file under 750KB.`;
 
 const FAQS = [
   {

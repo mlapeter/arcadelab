@@ -43,7 +43,7 @@ const FAQS = [
   {
     question: "What's the file size limit for a Three.js scene?",
     answer:
-      "500KB for the HTML file. Three.js itself is loaded from CDN separately and doesn't count. Procedurally generated scenes fit easily; scenes with large embedded models may not.",
+      "750KB for the HTML file. Three.js itself is loaded from CDN separately and doesn't count. Procedurally generated scenes fit easily; scenes with large embedded models may not.",
   },
 ];
 

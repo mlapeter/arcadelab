@@ -33,7 +33,7 @@ const FAQS = [
   {
     question: "What's the catch?",
     answer:
-      "Games must be a single HTML file under 500KB. All JavaScript and CSS must be inline. No network requests (fetch, XHR, WebSocket are blocked). That's the entire constraint.",
+      "Games must be a single HTML file under 750KB. All JavaScript and CSS must be inline. No network requests (fetch, XHR, WebSocket are blocked). That's the entire constraint.",
   },
   {
     question: "Can I make money from games on ArcadeLab?",
@@ -54,7 +54,7 @@ export default function Page() {
         <Link href="/" className="text-accent-purple underline">ArcadeLab</Link> hosts
         single-file HTML games for free with no signup, no email, no payment. You paste
         your complete HTML file at <Link href="/publish" className="text-accent-purple underline">arcadelab.ai/publish</Link> and get a public URL. The only
-        constraints: one HTML file, under 500KB, no network calls.
+        constraints: one HTML file, under 750KB, no network calls.
       </QuickAnswer>
 
       <p>
@@ -105,7 +105,7 @@ export default function Page() {
         What about the file size limit?
       </h2>
       <p>
-        500KB total. That sounds small but it&apos;s plenty for a single-file HTML game —
+        750KB total. That sounds small but it&apos;s plenty for a single-file HTML game —
         most AI-generated games come in well under 100KB. If you have heavy assets,
         consider procedural generation, base64-encoded sprites, or simpler graphics.
       </p>

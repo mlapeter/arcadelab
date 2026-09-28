@@ -93,7 +93,7 @@ const FAQS = [
   {
     question: "What size can the finished game be?",
     answer:
-      "ArcadeLab accepts single HTML files up to 500KB. A canvas game with inline code is usually far under that. Large image or audio assets are what push a file over the limit.",
+      "ArcadeLab accepts single HTML files up to 750KB. A canvas game with inline code is usually far under that. Large image or audio assets are what push a file over the limit.",
   },
   {
     question: "Will the game work on phones?",
